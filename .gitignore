@@ -1,0 +1,7 @@
+extract/dict_unique_goes
+extract/seqs_goes_str
+extract/seqs_str
+extract/uniprot-filtered-reviewed_yes.xml
+extract/.uniprot-filtered-reviewed_yes.xml.swp
+extract/go.obo
+prepare/data/*
