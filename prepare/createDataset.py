@@ -41,7 +41,9 @@ internal state which decides when reading if it exceed a given threshold.
 
 #Keep the sequences with a length max of:
 max_length_amino=512
-file_batch_size=20000
+file_batch_size=50000
+depth_classes=3
+depth_aminos=25
 
 #save processed data on disk
 def prepareDataset(inputData, labelData, filename):
@@ -63,11 +65,8 @@ def applyMask(dirtyData, dirty_idxs):
     return returnData
 
 def preprocessLabels(goes_seqs, dict_goes, classes):
-    #encode the categories
-    hot_vecs=np.identity(len(classes))
-
     #get GO's category and retrieve category hot encode
-    hot_cats_seqs=np.zeros((len(goes_seqs),len(classes)))
+    hot_cats_seqs=[]
     mask=[]
     for i, goes_list in enumerate(goes_seqs):
         hot_cat_seq=[]
@@ -75,8 +74,7 @@ def preprocessLabels(goes_seqs, dict_goes, classes):
             try:
                 className=dict_goes[goes]['class']
                 idx=classes.index(className)
-                hot_category=hot_vecs[idx]
-                hot_cat_seq.append(hot_category)
+                hot_cat_seq.append(idx)
             except:
                 #example goes not identified, discard it
                 continue
@@ -85,20 +83,11 @@ def preprocessLabels(goes_seqs, dict_goes, classes):
             mask.append(True)
         else:
             mask.append(False)
-        
-        #create a single label from labels.
-        #es. if ex1 has labels 0, 2 but not 1
-        #ex1=[[1,0,0], [0,0,1]] but not [0,1,0]
-        #its single label is ex1=[1,0,1]
-        hot_cat_seq=np.sum(hot_cat_seq, axis=0)
 
-        #keep only 1 or 0
-        hot_cat_seq=(hot_cat_seq >0)
-
-        hot_cats_seqs[i]=hot_cat_seq
+        hot_cats_seqs.append(hot_cat_seq)
 
     #return [seqs, hot_vec]
-    return np.array(hot_cats_seqs,dtype=np.uint8), mask
+    return hot_cats_seqs, mask
 
 def preprocessInpuData(seqs_str, aminos_list, max_length_amino): 
     '''
@@ -107,14 +96,11 @@ def preprocessInpuData(seqs_str, aminos_list, max_length_amino):
         aminos_list(list): each element is a single amino acid
         max_length_amino(int): discard the sequences longer than this number 
     ''' 
-    #create hot encode for each unique amino
-    hot_aminos=np.identity(len(aminos_list))
-
     #prepare the padded batch
     hot_aminos_seqs=[]
     mask=[]
     for i, seq_str in enumerate(seqs_str):
-        hot_amino_seq=np.zeros((max_length_amino, len(aminos_list)))
+        hot_amino_seq=[]
         if len(seq_str)<max_length_amino:
             enumerator=enumerate(seq_str)
             mask.append(False)
@@ -124,12 +110,12 @@ def preprocessInpuData(seqs_str, aminos_list, max_length_amino):
 
         for j, amino in enumerator:
             idx=aminos_list.index(amino)
-            hot_amino_seq[j]=hot_aminos[idx]
+            hot_amino_seq.append(idx)
 
         hot_aminos_seqs.append(hot_amino_seq)
 
     #assign hot_amino to each seq's amino
-    return np.array(hot_aminos_seqs, dtype=np.uint8), mask
+    return hot_aminos_seqs, mask
 
 def main():
     print('Importing files..')
@@ -152,7 +138,7 @@ def main():
         aminos_list=inputData['aminos']
 
     tot_examples=0
-    print('Creating chunks dataset..')
+    print('Creating dataset chunks..')
     for startBatch in range(1000, len(seqs_str), file_batch_size):
         endBatch=startBatch+file_batch_size
 

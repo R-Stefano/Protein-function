@@ -25,6 +25,11 @@ def generateTFRecord(examples_x, examples_y, filename):
         return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
     
     def serialize_example(input_example, label):
+        if (type(input_example)!=type(np.asarray([]))):
+            input_example=np.asarray(input_example, dtype=np.uint8)
+
+        if (type(label)!=type(np.asarray([]))):
+            label=np.asarray(label, dtype=np.uint8)
         """
         Creates a tf.Example
         input (array): np.array
@@ -35,9 +40,9 @@ def generateTFRecord(examples_x, examples_y, filename):
         features = {
             'inputData': _bytes_feature(input_example.tostring()),
             'labelData':  _bytes_feature(label.tostring()),
-            'input_aminos': _int64_feature(shapeInput[0]),
-            'amino_hot_length': _int64_feature(shapeInput[1]),
-            'label_hot_length': _int64_feature(shapeLabel[-1])
+            'hot_aminos': _int64_feature(25),
+            'hot_classes': _int64_feature(3),
+            'pad_aminos': _int64_feature(512-shapeInput[0])
         }
 
         # Create tf.train.Features obj asssigning encoded data
@@ -60,19 +65,21 @@ def decodeTFRecord(example_proto):
     feature_description = {
         'inputData': tf.io.FixedLenFeature([], tf.string),
         'labelData': tf.io.FixedLenFeature([], tf.string),
-        'input_aminos': tf.io.FixedLenFeature([], tf.int64),
-        'amino_hot_length': tf.io.FixedLenFeature([], tf.int64),
-        'label_hot_length': tf.io.FixedLenFeature([], tf.int64)
+        'hot_aminos': tf.io.FixedLenFeature([], tf.int64),
+        'hot_classes': tf.io.FixedLenFeature([], tf.int64),
+        'pad_aminos': tf.io.FixedLenFeature([], tf.int64)
     }
 
     # Parse the input tf.Example proto using the dictionary above.
     example=tf.io.parse_single_example(example_proto, feature_description)
     
     decodeInput=tf.io.decode_raw(example['inputData'], tf.uint8)
-    inputData=tf.reshape(decodeInput, (example['input_aminos'],example['amino_hot_length']))
+    hot_input=tf.one_hot(decodeInput, tf.cast(example['hot_aminos'], tf.int32), dtype=tf.float32)
+    inputData=tf.concat([hot_input, tf.zeros([example['pad_aminos'], 25], tf.float32)], axis=0)
 
     decodeLabel=tf.io.decode_raw(example['labelData'], tf.uint8)
-    labelData=tf.reshape(decodeLabel, (example['label_hot_length'],))
+    hot_label=tf.one_hot(decodeLabel, tf.cast(example['hot_classes'], tf.int32), dtype=tf.float32)
+    labelData=tf.math.reduce_max(hot_label, axis=0)
 
     batch={
         'X':inputData,

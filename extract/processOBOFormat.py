@@ -1,16 +1,7 @@
 import obonet
 import networkx
 import pickle
-'''
-I have found this library called obonet which allows to quickly parse the .obo file 
-and creating a graph based on the relationships described in the file. 
 
-library tutorial
-https://github.com/dhimmel/obonet/blob/master/examples/go-obonet.ipynb
-
-Let's start by predicting the macro-class which is only 3 classes compared to the 40k.
-
-'''
 graph = obonet.read_obo('go.obo')
 
 #Number of nodes
