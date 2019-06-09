@@ -87,14 +87,12 @@ def train():
             if i%500==0:
                 print('Train batch ({}/{})'.format(i, train_size//FLAGS.batch_size_train))
             train_step(batch['X'], batch['Y'])
-            break
 
         print('Testing..')
         for i, batch in enumerate(test_set):
             if i%500==0:
                 print('Test batch ({}/{})'.format(i, test_size//FLAGS.batch_size_test))
             test_step(batch['X'], batch['Y'])
-            break
         
         message='\nEpoch {} | Loss: {:.2f} | Accuracy: {:.2f} | Test Loss: {:.2f} | Test Accuracy: {:.2f} '
         print(message.format(ep, train_loss.result(),train_accuracy.result()*100,
