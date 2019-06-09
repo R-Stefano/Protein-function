@@ -7,6 +7,8 @@ from absl import app
 from absl import flags
 import train.model as mod
 
+import time
+
 FLAGS = flags.FLAGS
 
 dataPath=FLAGS.dataPath
@@ -24,14 +26,26 @@ test_accuracy = tf.keras.metrics.BinaryAccuracy(name='test_accuracy')
 
 @tf.function
 def train_step(x_batch, y_batch):
-  with tf.GradientTape() as tape:
-    predictions = model(x_batch, True, None)
-    loss = loss_object(y_batch, predictions)
-  gradients = tape.gradient(loss, model.trainable_variables)
-  optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-
-  train_loss(loss)
-  train_accuracy(y_batch, predictions)
+    #GradientTape traces operations to compute gradients later
+    with tf.GradientTape() as tape:
+        start=time.time()
+        predictions = model(x_batch, True, None)
+        print('time for compute batch prediction {:.2f} s'.format(time.time() - start))
+        start=time.time()
+        loss = loss_object(y_batch, predictions)
+        print('time to compute the loss {:.2f} s'.format(time.time() - start))
+    start=time.time()
+    gradients = tape.gradient(loss, model.trainable_variables)
+    print('time to compute the gradients {:.2f} s'.format(time.time() - start))
+    start=time.time()
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    print('time to apply gradients {:.2f} s'.format(time.time() - start))
+    start=time.time()
+    train_loss(loss)
+    print('time to save train loss {:.2f} s'.format(time.time() - start))
+    start=time.time()
+    train_accuracy(y_batch, predictions)
+    print('time to save train accuracy {:.2f} s'.format(time.time() - start))
 
 @tf.function
 def test_step(x_batch, y_batch):
@@ -80,20 +94,34 @@ def train():
     else:
         print("Initializing from scratch.")
 
+    #train_summary_writer = tf.summary.create_file_writer('/tmp/summaries/train')
+    #with train_summary_writer.as_default():
+        #tf.summary.scalar('loss', avg_loss.result(), step=optimizer.iterations)
+
     for ep in range(1, FLAGS.epoches +1):
         print('\nEpoch ({}/{})'.format(ep, FLAGS.epoches))
         print('Training..')
+        start=time.time()
         for i, batch in enumerate(train_set):
+            print('time to prepare train batch {:.2f} sec'.format(time.time() - start))
+            start=time.time()
             if i%500==0:
                 print('Train batch ({}/{})'.format(i, train_size//FLAGS.batch_size_train))
             train_step(batch['X'], batch['Y'])
+            print('####total train step time {:.2f} sec'.format(time.time()-start))
+            break
 
         print('Testing..')
+        start=time.time()
         for i, batch in enumerate(test_set):
+            print('time to prepare test batch {:.2f} sec'.format(time.time() - start))
+            start=time.time()
             if i%500==0:
                 print('Test batch ({}/{})'.format(i, test_size//FLAGS.batch_size_test))
             test_step(batch['X'], batch['Y'])
-        
+            print('total test step time {:.2f}'.format(time.time()-start))
+            break
+        break
         message='\nEpoch {} | Loss: {:.2f} | Accuracy: {:.2f} | Test Loss: {:.2f} | Test Accuracy: {:.2f} '
         print(message.format(ep, train_loss.result(),train_accuracy.result()*100,
                                  test_loss.result(),test_accuracy.result()*100))
