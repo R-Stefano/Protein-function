@@ -151,23 +151,78 @@ class EncoderLayer(tf.keras.layers.Layer):
     # (batch_size, input_seq_len, d_model)
     return out2
 
+class ConvLayer(tf.keras.layers.Layer):
+  def __init__(self, num_filters, filter_size, padding, stride):
+    super(ConvLayer, self).__init__()
+    '''
+    Called to inizialize a convolution layer. The convolution layer consists of:
+    -convolution 
+    -batch normalization
+    -activation function
+    '''
+
+    self.conv=tf.keras.layers.Conv2D(num_filters, filter_size, padding=padding, strides=stride)
+    self.norm=tf.keras.layers.BatchNormalization()
+    self.activation=x =tf.keras.activations.relu
+  
+  def call(self, x):
+    x=self.conv(x)
+    x_norm=self.norm(x)
+    output=self.activation(x_norm)
+    return output
 
 class Transformer(tf.keras.Model):
   def __init__(self, num_layers, d_model, num_heads, dff, target_size, rate=0.1):
     super(Transformer, self).__init__()
+    '''
+    This class is used to mix togheter different architecture layers. 
+    At the moment there is:
+      -Transformer (calle encoded layer, will be called self_attention layer) todo: merge heads option (?)
+      -convolution (conv + batch + relu): todo: making them optional
+    
+    When initialized, you have to define: 
+      self.num_layers: num transformer layers. todo: rename to att_layer
+      self.num_conv_layers: number of convolution layers 
+    '''
 
     self.num_layers=num_layers
+    self.num_conv_layers=6
+    self.num_filters_layers=[32, 32, 64, 64, 128]
+    #if num_conv_layers is higher than the filters defined, repeat the last filter dimension
+    if (self.num_conv_layers!=len(self.num_filters_layers)):
+      for _ in range(self.num_conv_layers-len(self.num_filters_layers)):
+        self.num_filters_layers.append(self.num_filters_layers[-1])
+    filter_size=5
+    padding='valid'
+    stride=2
 
-    self.net_layers=[EncoderLayer(d_model, num_heads, dff) for _ in range(num_layers)]
+    #Define transformers layers
+    self.trans_layers=[EncoderLayer(d_model, num_heads, dff) for _ in range(num_layers)]
+    #Define convolutional layers
+    self.conv_layers=[]
+    for i in range(self.num_conv_layers):
+      self.conv_layers.append(ConvLayer(self.num_filters_layers[i], filter_size, padding, stride))
 
+    #Define fully connected layer
     self.final_layer = tf.keras.layers.Dense(target_size)
     
   def call(self, x, training, mask):
     
     for i in range(self.num_layers):
-      x = self.net_layers[i](x, training, mask)
+      x = self.trans_layers[i](x, training, mask)
+    
+    print('Shape after transformer:', x.shape)
+    #add the 4 dimension
+    x=tf.expand_dims(x, -1)
+
+    for i in range(self.num_conv_layers):
+      x=self.conv_layers[i](x)
+      print('Shape after convolution',i,':', x.shape)
     
     x=tf.reshape(x, (x.shape[0],-1))
+    print('Shape after flatten it:', x.shape)
+    print('\n\n')
+
     final_output = self.final_layer(x)
     
     return final_output
