@@ -1,0 +1,5 @@
+examples: 434451
+max_length_aminos: 512
+unique_aminos: [M, F, K, V, E, N, A, P, I, L, W, D, S, Q, R, G, C, T, Y, H, U, X,
+  B, Z, O]
+unique_labels: 45006

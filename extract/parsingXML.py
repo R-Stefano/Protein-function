@@ -1,3 +1,14 @@
+'''
+This script parses the uniprot.xml file to extract 
+the amino acid sequences their go notations.
+
+For each protein in the dataset, the amino acid sequence 
+in string format and the list of its go notations are extracted and saved on disk.
+
+This file creates and save proteinsSeqs and proteinsGoes like:
+proteinsSeqs=[seq1, seq2]
+proteinsGoes=[[go1,go2],[go1]]
+'''
 import xml.etree.ElementTree as ET
 import pickle
 import numpy as np
@@ -7,24 +18,18 @@ rawFilename='uniprot-filtered-reviewed_yes.xml'
 print('Parsing the xml to extract the data..')
 context = ET.iterparse(rawFilename, events=('start', 'end'))
 
-inputSeqs=[]
-unique_input_amino={}
-length_seqs=[]
-labelData=[]
-count=0
+proteinsSeqs=[]
+proteinsGoes=[]
 
-bufferGOList=[]
+count=0
+bufferGOList=[] #stores the goes for each protein
 for evt, element in context:
     if count%1000000==0 and count>1000000:
-        print('Number examples retrieved:',len(inputSeqs))
-        print('longest sequence:', max(length_seqs))
-        print('average length:',np.mean(length_seqs))
-        print('var length:',np.var(length_seqs))        
-        print('\n\n\n')
+        print('Number examples retrieved:',len(proteinsSeqs))
 
 
     if (('entry' in element.tag) and (evt=='end')):
-        labelData.append(bufferGOList)
+        proteinsGoes.append(bufferGOList)
         bufferGOList=[]
 
         #throw away the element
@@ -39,34 +44,17 @@ for evt, element in context:
         if (('sequence' in element.tag) and (evt=='end')):
             seq=element.text.replace('\n','')
 
-            length_seqs.append(len(seq))
-            #See how many unique amino-acids there are
-            for a in seq:
-                unique_input_amino[a]=1
-
-            inputSeqs.append(seq)
+            proteinsSeqs.append(seq)
     except:
         continue
 
     count +=1
 
-print('length:',len(inputSeqs))
-print('length:',len(labelData))
-print('Number unique amino-acids:', len(unique_input_amino))
-print('List unique amino-acids:', list(unique_input_amino.keys()))
-'''
-List unique amino-acids: 
-['M', 'F', 'K', 'V', 'E', 'N', 'A', 'P', 'I', 'L', 'W', 'D', 'S', 'Q', 'R', 
-'G', 'C', 'T', 'Y', 'H', 'U', 'X', 'B', 'Z', 'O']
+print('Number of prot sequences:',len(proteinsSeqs))
+print('Number of prot goes:',len(proteinsGoes))
 
-'''
+with open("proteins_seqs", "wb") as fp:
+    pickle.dump(proteinsSeqs, fp)
 
-inputData={
-    'seqs':inputSeqs, 
-    'aminos':list(unique_input_amino.keys())
-    }
-with open("seqs_str", "wb") as fp:
-    pickle.dump(inputData, fp)
-
-with open("seqs_goes_str", "wb") as fp:
-    pickle.dump(labelData, fp)
+with open("proteins_goes", "wb") as fp:
+    pickle.dump(proteinsGoes, fp)

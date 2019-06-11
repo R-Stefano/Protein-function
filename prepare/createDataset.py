@@ -1,30 +1,47 @@
+'''
+This scripts creates to be fed into the model.
+
+It convertes each amino acid sequence into a list of idexes.
+The indexes indicate the amino acid. such as [ARNDCA] -> [0,1,2,3,4,0]
+
+Same, it converts the go notations into a list of indexes.
+[GO1, GO2, GO3] -> [0,1,2]
+
+Finally, it creates train and test datasets.
+
+#move it the article
+the reason why I encoded as indexs and not directly as hot encode is to have a 
+dataset that weight only 200 MB compared to GBs. The hot-encoding is done 
+by tensorflow API when it fecth a batch of examples for training.
+
+To speed up training I could have stored already in hot vec but it would have 
+created a dataset of 6GB harder to move around. it has been only an implementation choice
+
+In order to create the hot encoding later on, I have to provide the number of 
+possible idxs. The possible idxs equals to the number of unique amino acids
+and the number of unique go notations.
+
+Some proteins have go notations not available in the go.obo file. If a protein 
+has any go notation match, the example is discarded
+
+Same for the sequences, if the sequence is longer than a given threshold,
+the example is discarded.
+
+Finally, only the examples that are not discarded both for go notation and max seq length
+are used for training and testing
+
+'''
 import numpy as np
 import pickle
 import sys
-import tfapiConverter as tfconv
+from absl import flags
+import yaml
+from sklearn.model_selection import train_test_split
 
-'''
-There are 560118 sequences that must be hot encoded (for the moment).
-So, first to count how many unique amino acids there are. 
-Then, create the hot encode vectors
-Finally, for each amino acid associate its own hot vector.
-Store the results in a new file.
+import prepare.tfapiConverter as tfconv
 
-I had a memory problems when I try to dsave on disk the batches.
-SO, I thought thta maybe isterad of reinventing the wheel, it could worth a try to 
-explore if tensorflow cameup with some API. 
+FLAGS = flags.FLAGS
 
-The data are encoded as uint8 (0,255) which is the most space efficient format.
-For example, a matrix of [597, 512, 25)] in flat64=61.1 MB
-                                            in uint8=7.6 MB
-This is possible because The vectors only have values 0 and 1
-
-This class takes as input the pickles about:
-sequence as string, goes for each sequence, category of the goes
-
-output:
-tfrecords ready to be load and processed
-'''
 
 '''
 the for loop is a lstm. The while must explicitly implement when get out of the loop, the for loop can keep going.
@@ -38,23 +55,24 @@ read other loops.
 When they do it could be at each timestep or they output when to read. So, there is an 
 internal state which decides when reading if it exceed a given threshold.
 '''
+'''
+TODO:
+store in yaml file the list of unique aminos
+store in yaml file the max length to use
 
-#Keep the sequences with a length max of:
-max_length_amino=512
-file_batch_size=50000
-depth_classes=3
-depth_aminos=25
+no batch, load everything at once, then train test split and finall save.
+
+save in numpy format if it works. 
+'''
 
 #save processed data on disk
 def prepareDataset(inputData, labelData, filename):
-    print('Saving:', filename)
-    data={
-        'X': inputData,
-        'Y': labelData
-    }
+    print('Saving', filename)
 
-    tfconv.generateTFRecord(inputData, labelData, 'data/'+filename+'.tfrecords')
+    X_train, X_test, y_train, y_test = train_test_split(inputData, labelData, test_size=0.33, random_state=0)
 
+    tfconv.generateTFRecord(X_train, y_train, 'prepare/data/train/'+filename+'.tfrecords')
+    tfconv.generateTFRecord(X_test, y_test, 'prepare/data/test/'+filename+'.tfrecords')
 
 def applyMask(dirtyData, dirty_idxs):
     if (type(dirtyData)!=type(np.asarray([]))):
@@ -64,17 +82,26 @@ def applyMask(dirtyData, dirty_idxs):
 
     return returnData
 
-def preprocessLabels(goes_seqs, dict_goes, classes):
+def preprocessLabels(goes_seqs, unique_goes):
+    '''
+    This function index the go notations for each sequence
+
+    Args:
+        goes_seques (list): each element is a list of go notations for a protein
+        unique_goes (list): list of unique goes
+    
+    Return:
+        hot_cats_seqs (list): each element is a list of indexed go notations
+        mask (list): list of bools, if True the example must be discarded
+    '''
     #get GO's category and retrieve category hot encode
     hot_cats_seqs=[]
     mask=[]
     for i, goes_list in enumerate(goes_seqs):
         hot_cat_seq=[]
-        for goes in goes_list:
+        for go in goes_list:
             try:
-                className=dict_goes[goes]['class']
-                idx=classes.index(className)
-                hot_cat_seq.append(idx)
+                hot_cat_seq.append(unique_goes.index(go))
             except:
                 #example goes not identified, discard it
                 continue
@@ -86,21 +113,27 @@ def preprocessLabels(goes_seqs, dict_goes, classes):
 
         hot_cats_seqs.append(hot_cat_seq)
 
-    #return [seqs, hot_vec]
+    #return [goes_idxs_lists], [bools]
     return hot_cats_seqs, mask
 
-def preprocessInpuData(seqs_str, aminos_list, max_length_amino): 
+def preprocessInpuData(seqs_str, unique_aminos, max_length_amino): 
     '''
-    input:
+    This function index the amino acids for each sequence
+    Args:
         seqs_str(list): each element is a string of amino acids
-        aminos_list(list): each element is a single amino acid
+        unique_aminos(list): list of unique ami42no acids
         max_length_amino(int): discard the sequences longer than this number 
+
+    Return:
+        hot_aminos_seqs (list): each element is a list of indexed amino acids
+        mask (list): list of bools, if True the example must be discarded
     ''' 
-    #prepare the padded batch
+
     hot_aminos_seqs=[]
     mask=[]
     for i, seq_str in enumerate(seqs_str):
         hot_amino_seq=[]
+        #discard sequences longer than max_length amino
         if len(seq_str)<max_length_amino:
             enumerator=enumerate(seq_str)
             mask.append(False)
@@ -109,7 +142,7 @@ def preprocessInpuData(seqs_str, aminos_list, max_length_amino):
             mask.append(True)
 
         for j, amino in enumerator:
-            idx=aminos_list.index(amino)
+            idx=unique_aminos.index(amino)
             hot_amino_seq.append(idx)
 
         hot_aminos_seqs.append(hot_amino_seq)
@@ -117,44 +150,51 @@ def preprocessInpuData(seqs_str, aminos_list, max_length_amino):
     #assign hot_amino to each seq's amino
     return hot_aminos_seqs, mask
 
-def main():
+def createDataset():
     print('Importing files..')
-    #FOR LABEL DATA:
-    #get the GOs for each example
-    with open("../extract/seqs_goes_str", "rb") as fp:
-        goes_seqs = pickle.load(fp)
+    with open("extract/go_dictionary", "rb") as fp:
+        go_dictionary=pickle.load(fp)
 
-    #get the dictionary of unique GOs
-    with open("../extract/dict_unique_goes", "rb") as fp:
-        labelData=pickle.load(fp)
-        dict_goes=labelData['dict_goes']
-        classes=labelData['classes']
+    with open("extract/proteins_goes", "rb") as fp:
+        proteins_goes=pickle.load(fp)
 
-    #FOR INPUT DATA:
-    #get the sequences as string
-    with open("../extract/seqs_str", "rb") as fp:
-        inputData = pickle.load(fp)
-        seqs_str=inputData['seqs']
-        aminos_list=inputData['aminos']
+    with open("extract/proteins_seqs", "rb") as fp:
+        proteins_seqs=pickle.load(fp)
+
+    with open("hyperparams.yaml", 'r') as stream:
+        hyperparams = yaml.safe_load(stream)
+
+    #get unique goes as list
+    unique_goes=list(go_dictionary.keys())
+
+    #get the unique aminos
+    unique_aminos=hyperparams['unique_aminos']
+
+    #get max length to use
+    max_length_amino=FLAGS.max_length_aminos
 
     tot_examples=0
-    print('Creating dataset chunks..')
-    for startBatch in range(1000, len(seqs_str), file_batch_size):
+    file_batch_size=100000
+    print('Creating dataset..')
+    for startBatch in range(0, len(proteins_goes), file_batch_size):
         endBatch=startBatch+file_batch_size
 
-        batch_goes_seqs=goes_seqs[startBatch:endBatch]
-        batch_seqs_str=seqs_str[startBatch:endBatch]
+        batch_proteins_goes=proteins_goes[startBatch:endBatch]
+        batch_proteins_seqs=proteins_seqs[startBatch:endBatch]
 
         #Labels: return [seqs, hot_vec]
-        dirty_labelData, mask_empty_examples=preprocessLabels(batch_goes_seqs, dict_goes, classes)
+        print('Preprocessing labels..')
+        dirty_labelData, mask_empty_examples=preprocessLabels(batch_proteins_goes, unique_goes)
 
         #Inputs: return [seqs, num_aminos, hot_vec]
-        dirty_inputData, mask_too_long_examples=preprocessInpuData(batch_seqs_str, aminos_list, max_length_amino)
+        print('Preprocessing input data..')
+        dirty_inputData, mask_too_long_examples=preprocessInpuData(batch_proteins_seqs, unique_aminos, max_length_amino)
 
         #merge the two masks (or operator)
         dirty_idxs=np.logical_or(mask_empty_examples,mask_too_long_examples)
 
         #remove dirty examples
+        print('Removing dirty examples..')
         batch_inputData=applyMask(dirty_inputData, dirty_idxs)
         batch_labelData=applyMask(dirty_labelData, dirty_idxs)
         print('Ready input data:', batch_inputData.shape, 'values type', batch_inputData.dtype, 'size:', sys.getsizeof(batch_inputData)*1e-6,'MB')
@@ -162,10 +202,11 @@ def main():
 
         tot_examples+=batch_inputData.shape[0]
 
-        filename='dataset_'+str(startBatch//file_batch_size)
+        filename='dataset-'+str(startBatch//file_batch_size)
         prepareDataset(batch_inputData, batch_labelData, filename)
-        print('\n')
-    print('Total number of examples', tot_examples)
 
-if __name__ == '__main__':
-    main()
+    print('Total number of examples', tot_examples)
+    hyperparams['examples']=tot_examples
+
+    with open('hyperparams.yaml', 'w') as outfile:
+        yaml.dump(hyperparams, outfile)

@@ -1,19 +1,18 @@
 import tensorflow as tf
-import prepare.tfapiConverter as tfconv
-
 import os
 import multiprocessing
-from absl import app
 from absl import flags
-import train.model as mod
-
 import time
+import numpy as np
+
+import train.model as mod
+import prepare.tfapiConverter as tfconv
 
 FLAGS = flags.FLAGS
 
 dataPath=FLAGS.dataPath
 modelPath='./train/ckpt'
-model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.target_size)
+model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.unique_labels)
 
 loss_object = tf.keras.losses.BinaryCrossentropy()
 optimizer = tf.keras.optimizers.Adam()
@@ -46,35 +45,34 @@ def test_step(x_batch, y_batch):
   test_accuracy(y_batch, predictions)
 
 def train():
-    filenames=[dataPath+fn for fn in os.listdir(dataPath)]
-    test_size=int(FLAGS.num_examples*FLAGS.ratio_test_examples)
-    train_size=FLAGS.num_examples - test_size
+    train_path=dataPath+'train/'
+    test_path=dataPath+'test/'
+    train_files=[train_path+fn for fn in os.listdir(train_path)]
+    test_files=[test_path+fn for fn in os.listdir(test_path)]
 
-    raw_dataset=tf.data.TFRecordDataset(filenames)
-    #raw_dataset = tf.data.Dataset.from_tensor_slices((fileData))
-
-    print('train size:',train_size)
-    print('test size:',test_size)    
+    train_dataset=tf.data.TFRecordDataset(train_files)
+    test_dataset=tf.data.TFRecordDataset(test_files)
 
     #convert batch data from tfrecord to tensors during iteration
     #num_parallel_calls: distribute the preprocessing (decoding, hot encoding) across cpus
-    dataset = raw_dataset.map(tfconv.decodeTFRecord, num_parallel_calls=multiprocessing.cpu_count())
+    train_dataset = train_dataset.map(tfconv.decodeTFRecord, num_parallel_calls=multiprocessing.cpu_count())
+    test_dataset = test_dataset.map(tfconv.decodeTFRecord, num_parallel_calls=multiprocessing.cpu_count())
     #or tf.data.experimental.AUTOTUNEif you prefer
 
     #Shuffle dataset once
-    dataset = dataset.shuffle(buffer_size=FLAGS.shuffle_buffer_size, reshuffle_each_iteration=FLAGS.reshuffle_iteration, seed=0)
+    train_dataset = train_dataset.shuffle(buffer_size=FLAGS.shuffle_buffer_size, reshuffle_each_iteration=FLAGS.reshuffle_iteration, seed=0)
 
     #Number of iterations (repeat the whole dataset)
     #dataset=dataset.repeat(epoches)
 
-    #create train/test datasets and create batches
-    test_set = dataset.take(test_size).batch(FLAGS.batch_size_test)
-    train_set = dataset.skip(test_size).batch(FLAGS.batch_size_train)
+    #create create batches
+    train_set = train_dataset.batch(FLAGS.batch_size_test)
+    test_set = test_dataset.batch(FLAGS.batch_size_train)
 
     #Store in memory buffer_size examples to be ready to be fed to the GPU
     #load batch*2 examples for the train step (T+1) while GPU occupied with train step (T)
-    test_set = test_set.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
     train_set = train_set.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    test_set = test_set.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=optimizer, net=model)
     manager = tf.train.CheckpointManager(ckpt, modelPath, max_to_keep=3)
@@ -97,10 +95,6 @@ def train():
 
             ckpt.step.assign_add(1)
 
-            if int(ckpt.step)%10==0:
-                save_path = manager.save()
-                print("Saved checkpoint | global step {}: {}".format(int(ckpt.step), save_path))
-
         #testing
         for i, batch in enumerate(test_set):
             test_step(batch['X'], batch['Y'])
@@ -108,7 +102,10 @@ def train():
         message='\nEpoch {} in {:.2f} secs | Loss: {:.2f} | Accuracy: {:.2f} | Test Loss: {:.2f} | Test Accuracy: {:.2f}'
         print(message.format(ep, (time.time()-start),train_loss.result(),train_accuracy.result()*100,
                                  test_loss.result(),test_accuracy.result()*100))
-        
+
+        save_path = manager.save()
+        print("Saved checkpoint | global step {}: {}".format(int(ckpt.step), save_path))
+
         train_loss.reset_states()
         train_accuracy.reset_states()
         test_loss.reset_states()

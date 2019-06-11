@@ -6,6 +6,18 @@ decodeTFRecord() takes as input a tfrecord and output a banch of examples(x,y)
 '''
 import tensorflow as tf
 import numpy as np
+from absl import flags
+FLAGS = flags.FLAGS
+
+#get unique lables
+unique_labels=FLAGS.unique_labels
+
+#get the unique aminos
+unique_aminos=FLAGS.unique_aminos
+
+#get max length to use
+max_length_amino=FLAGS.max_length_aminos
+
 def generateTFRecord(examples_x, examples_y, filename):
     '''
     In a tf.train.Example, features can be only of 3 types:
@@ -40,9 +52,9 @@ def generateTFRecord(examples_x, examples_y, filename):
         features = {
             'inputData': _bytes_feature(input_example.tostring()),
             'labelData':  _bytes_feature(label.tostring()),
-            'hot_aminos': _int64_feature(25),
-            'hot_classes': _int64_feature(3),
-            'pad_aminos': _int64_feature(512-shapeInput[0])
+            'hot_aminos': _int64_feature(unique_aminos),
+            'hot_classes': _int64_feature(unique_labels),
+            'pad_aminos': _int64_feature(max_length_amino-shapeInput[0])
         }
 
         # Create tf.train.Features obj asssigning encoded data
@@ -75,7 +87,7 @@ def decodeTFRecord(example_proto):
     
     decodeInput=tf.io.decode_raw(example['inputData'], tf.uint8)
     hot_input=tf.one_hot(decodeInput, tf.cast(example['hot_aminos'], tf.int32), dtype=tf.float32)
-    inputData=tf.concat([hot_input, tf.zeros([example['pad_aminos'], 25], tf.float32)], axis=0)
+    inputData=tf.concat([hot_input, tf.zeros([example['pad_aminos'], example['hot_aminos']], tf.float32)], axis=0)
 
     decodeLabel=tf.io.decode_raw(example['labelData'], tf.uint8)
     hot_label=tf.one_hot(decodeLabel, tf.cast(example['hot_classes'], tf.int32), dtype=tf.float32)
