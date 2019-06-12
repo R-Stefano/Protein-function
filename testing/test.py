@@ -1,19 +1,23 @@
 import yaml
+import tensorflow as tf
+import numpy as np
+bce = tf.keras.losses.BinaryCrossentropy()
 
-data={
-    'labels': 'hello'
-}
+labels=[0,1]
+preds=[0.2,0.8]
+
+labels=tf.cast(labels, tf.float32)
+preds=tf.cast(preds, tf.float32)
 
 
-with open('data.yaml', 'w') as outfile:
-    yaml.dump(data, outfile)
 
-with open("data.yaml", 'r') as stream:
-    data_loaded = yaml.safe_load(stream)
+loss = bce(labels, preds)
+print('Loss: ', loss.numpy())  # Loss: 12.007
 
-with open('data.yaml', 'a') as outfile:
-    yaml.dump({'categories':'hello'}, outfile)
+m = tf.keras.metrics.Precision(thresholds=[0.1,0.9])
+m.update_state(labels, preds)
+print('Precision result: ', m.result().numpy())  # Final result: 0.66
 
-with open("data.yaml", 'r') as stream:
-    data_loaded = yaml.safe_load(stream)
-print(data_loaded)
+m = tf.keras.metrics.Recall()
+m.update_state(labels, preds)
+print('Recall result: ', m.result().numpy())  # Final result: 0.66

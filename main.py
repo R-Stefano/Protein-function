@@ -26,10 +26,10 @@ with open("hyperparams.yaml", 'r') as stream:
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('epoches', 2, 'Training epoches')
+flags.DEFINE_integer('epoches', 100, 'Training epoches')
 flags.DEFINE_integer('batch_size_train', 32, 'Size of batch size for training')
 flags.DEFINE_integer('batch_size_test', 64, 'Size of batch size for testing')
-flags.DEFINE_integer('shuffle_buffer_size', 1000, 'Number of examples to load before shuffling')
+flags.DEFINE_integer('shuffle_buffer_size', 50000, 'Number of examples to load before shuffling')
 flags.DEFINE_boolean('reshuffle_iteration', False, 'Shuffle examples at each epoch')
 
 flags.DEFINE_integer('num_layers', 1, 'Number of layers in the Transformer')
@@ -49,13 +49,16 @@ FLAGS(sys.argv)
 
 import train.trainer as trainer
 import prepare.createDataset as createDataset
+import analyze.predictor as model
 
 
 def main(argvs):
-    if (FLAGS.mode=='train'):
-        trainer.train()
-    elif (FLAGS.mode=='createdata'):
+    if (FLAGS.mode=='createdata'):
         createDataset.createDataset()
+    elif (FLAGS.mode=='train'):
+        trainer.train()
+    elif (FLAGS.mode=='predict'):
+        model.predict()
     else:
         print('No mode selected')
 

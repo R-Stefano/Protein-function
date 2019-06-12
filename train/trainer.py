@@ -4,7 +4,7 @@ import multiprocessing
 from absl import flags
 import time
 import numpy as np
-
+from tensorflow import keras
 import train.model as mod
 import prepare.tfapiConverter as tfconv
 
@@ -27,7 +27,7 @@ test_accuracy = tf.keras.metrics.BinaryAccuracy(name='test_accuracy')
 def train_step(x_batch, y_batch):
     #GradientTape traces operations to compute gradients later
     with tf.GradientTape() as tape:
-        predictions = model(x_batch, True, None)
+        predictions = model(x_batch)
         loss = loss_object(y_batch, predictions)
 
     gradients = tape.gradient(loss, model.trainable_variables)
@@ -38,7 +38,7 @@ def train_step(x_batch, y_batch):
 
 @tf.function
 def test_step(x_batch, y_batch):
-  predictions = model(x_batch, False, None)
+  predictions = model(x_batch)
   t_loss = loss_object(y_batch, predictions)
 
   test_loss(t_loss)
@@ -66,8 +66,8 @@ def train():
     #dataset=dataset.repeat(epoches)
 
     #create create batches
-    train_set = train_dataset.batch(FLAGS.batch_size_test)
-    test_set = test_dataset.batch(FLAGS.batch_size_train)
+    train_set = train_dataset.batch(FLAGS.batch_size_train)
+    test_set = test_dataset.batch(FLAGS.batch_size_test)
 
     #Store in memory buffer_size examples to be ready to be fed to the GPU
     #load batch*2 examples for the train step (T+1) while GPU occupied with train step (T)
@@ -92,7 +92,6 @@ def train():
         #training
         for i, batch in enumerate(train_set):
             train_step(batch['X'], batch['Y'])
-
             ckpt.step.assign_add(1)
 
         #testing
@@ -112,5 +111,6 @@ def train():
         test_accuracy.reset_states()
 
     print('Saving final model..')
-    manager.save()
+    #How to save a model developed using Imperative style
+    model.save_weights("train/saved_model/module_without_signature", save_format='tf')
         
