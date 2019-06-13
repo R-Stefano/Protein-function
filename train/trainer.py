@@ -6,7 +6,9 @@ import time
 import numpy as np
 from tensorflow import keras
 import train.model as mod
+
 import prepare.tfapiConverter as tfconv
+import analyze.custom_metrics as custom
 
 FLAGS = flags.FLAGS
 
@@ -17,11 +19,21 @@ model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_he
 loss_object = tf.keras.losses.BinaryCrossentropy()
 optimizer = tf.keras.optimizers.Adam()
 
+#Loss Metrics
 train_loss = tf.keras.metrics.Mean(name='train_loss')
-train_accuracy = tf.keras.metrics.BinaryAccuracy(name='train_accuracy')
-
 test_loss = tf.keras.metrics.Mean(name='test_loss')
-test_accuracy = tf.keras.metrics.BinaryAccuracy(name='test_accuracy')
+
+#Metrics
+thresholds=np.arange(start=0.1, stop=1.0, step=0.1)
+
+train_precision = tf.keras.metrics.Precision(name='train_precision')
+train_recall = tf.keras.metrics.Recall(name='train_recall')
+train_f1_max =custom.F1MaxScore(thresholds, name="train_f1_max")
+
+test_precision= tf.keras.metrics.Precision(name='test_precision')
+test_recall= tf.keras.metrics.Recall(name='test_recall')
+test_f1_max=custom.F1MaxScore(thresholds, name="test_f1_max")
+
 
 @tf.function
 def train_step(x_batch, y_batch):
@@ -34,15 +46,19 @@ def train_step(x_batch, y_batch):
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
     train_loss(loss)
-    train_accuracy(y_batch, predictions)
+    train_precision(y_batch, predictions)
+    train_recall(y_batch, predictions)
+    train_f1_max(y_batch, predictions)
 
 @tf.function
 def test_step(x_batch, y_batch):
-  predictions = model(x_batch)
-  t_loss = loss_object(y_batch, predictions)
+    predictions = model(x_batch)
+    t_loss = loss_object(y_batch, predictions)
 
-  test_loss(t_loss)
-  test_accuracy(y_batch, predictions)
+    test_loss(t_loss)
+    test_precision(y_batch, predictions)
+    test_recall(y_batch, predictions)
+    test_f1_max(y_batch, predictions)
 
 def train():
     train_path=dataPath+'train/'
@@ -82,6 +98,8 @@ def train():
     else:
         print("Initializing from scratch.")
 
+    train_summary_writer = tf.summary.create_file_writer('train/logs/train')
+    test_summary_writer = tf.summary.create_file_writer('train/logs/test')
     #train_summary_writer = tf.summary.create_file_writer('/tmp/summaries/train')
     #with train_summary_writer.as_default():
         #tf.summary.scalar('loss', avg_loss.result(), step=optimizer.iterations)
@@ -93,22 +111,41 @@ def train():
         for i, batch in enumerate(train_set):
             train_step(batch['X'], batch['Y'])
             ckpt.step.assign_add(1)
+            
+            if (i%200==0):
+                with train_summary_writer.as_default():
+                    tf.summary.scalar('loss', train_loss.result(), step=int(ckpt.step))
+                    tf.summary.scalar('precision', train_precision.result(), step=int(ckpt.step))
+                    tf.summary.scalar('recall', train_recall.result(), step=int(ckpt.step))
+                    tf.summary.scalar('f1_max', train_f1_max.result(), step=int(ckpt.step))
+
+                    train_loss.reset_states()
+                    train_precision.reset_states()
+                    train_recall.reset_states()
+                    train_f1_max.reset_states()
+            break
 
         #testing
         for i, batch in enumerate(test_set):
             test_step(batch['X'], batch['Y'])
+            break
 
-        message='\nEpoch {} in {:.2f} secs | Loss: {:.2f} | Accuracy: {:.2f} | Test Loss: {:.2f} | Test Accuracy: {:.2f}'
-        print(message.format(ep, (time.time()-start),train_loss.result(),train_accuracy.result()*100,
-                                 test_loss.result(),test_accuracy.result()*100))
+        with test_summary_writer.as_default():
+            tf.summary.scalar('loss', test_loss.result(), step=int(ckpt.step))
+            tf.summary.scalar('precision', test_precision.result(), step=int(ckpt.step))
+            tf.summary.scalar('recall', test_recall.result(), step=int(ckpt.step))
+            tf.summary.scalar('f1_max', test_f1_max.result(), step=int(ckpt.step))
+
+            test_loss.reset_states()
+            test_precision.reset_states()
+            test_recall.reset_states()
+            test_f1_max.reset_states()
+
+        message='Epoch {} in {:.2f} secs'
+        print(message.format(ep, (time.time()-start)))
 
         save_path = manager.save()
         print("Saved checkpoint | global step {}: {}".format(int(ckpt.step), save_path))
-
-        train_loss.reset_states()
-        train_accuracy.reset_states()
-        test_loss.reset_states()
-        test_accuracy.reset_states()
 
     print('Saving final model..')
     #How to save a model developed using Imperative style

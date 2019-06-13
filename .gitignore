@@ -8,3 +8,4 @@ prepare/data/*
 testing/*
 train/ckpt/*
 prepare/.ipynb_checkpoints/*
+analyze/models/*
