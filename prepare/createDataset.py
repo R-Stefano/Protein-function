@@ -116,13 +116,12 @@ def preprocessLabels(goes_seqs, unique_goes):
     #return [goes_idxs_lists], [bools]
     return hot_cats_seqs, mask
 
-def preprocessInpuData(seqs_str, unique_aminos, max_length_amino): 
+def preprocessInpuData(seqs_str, unique_aminos): 
     '''
     This function index the amino acids for each sequence
     Args:
         seqs_str(list): each element is a string of amino acids
         unique_aminos(list): list of unique ami42no acids
-        max_length_amino(int): discard the sequences longer than this number 
 
     Return:
         hot_aminos_seqs (list): each element is a list of indexed amino acids
@@ -133,12 +132,13 @@ def preprocessInpuData(seqs_str, unique_aminos, max_length_amino):
     mask=[]
     for i, seq_str in enumerate(seqs_str):
         hot_amino_seq=[]
-        #discard sequences longer than max_length amino
-        if len(seq_str)<max_length_amino:
+        #discard sequences shorter and longer than given thresholds
+        l_seq=len(seq_str)
+        if ((l_seq>=FLAGS.min_length_aminos) and (l_seq<=FLAGS.max_length_aminos)):
             enumerator=enumerate(seq_str)
             mask.append(False)
         else:
-            enumerator=enumerate(seq_str[:max_length_amino])
+            enumerator=enumerate(seq_str[:FLAGS.max_length_aminos])
             mask.append(True)
 
         for j, amino in enumerator:
@@ -152,9 +152,6 @@ def preprocessInpuData(seqs_str, unique_aminos, max_length_amino):
 
 def createDataset():
     print('Importing files..')
-    with open("extract/go_dictionary", "rb") as fp:
-        go_dictionary=pickle.load(fp)
-
     with open("extract/proteins_goes", "rb") as fp:
         proteins_goes=pickle.load(fp)
 
@@ -165,16 +162,13 @@ def createDataset():
         hyperparams = yaml.safe_load(stream)
 
     #get unique goes as list
-    unique_goes=list(go_dictionary.keys())
+    unique_goes=hyperparams['available_goes']
 
     #get the unique aminos
     unique_aminos=hyperparams['unique_aminos']
 
-    #get max length to use
-    max_length_amino=FLAGS.max_length_aminos
-
     tot_examples=0
-    file_batch_size=100000
+    file_batch_size=200000
     print('Creating dataset..')
     for startBatch in range(0, len(proteins_goes), file_batch_size):
         endBatch=startBatch+file_batch_size
@@ -188,7 +182,7 @@ def createDataset():
 
         #Inputs: return [seqs, num_aminos, hot_vec]
         print('Preprocessing input data..')
-        dirty_inputData, mask_too_long_examples=preprocessInpuData(batch_proteins_seqs, unique_aminos, max_length_amino)
+        dirty_inputData, mask_too_long_examples=preprocessInpuData(batch_proteins_seqs, unique_aminos)
 
         #merge the two masks (or operator)
         dirty_idxs=np.logical_or(mask_empty_examples,mask_too_long_examples)

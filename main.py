@@ -1,6 +1,3 @@
-import tensorflow as tf
-import pickle
-import numpy as np
 import sys
 from absl import app
 from absl import flags
@@ -19,7 +16,7 @@ How I have them ready to feed into my network?
 filter out some data. could be useful to avoid to store the wholle matricies on disk
 dataset = dataset.filter(filter_fn)
 '''
-
+#TO RUN THIS, BE SURE THAT THE hyperparams.yaml file has been created
 with open("hyperparams.yaml", 'r') as stream:
     hyperparams = yaml.safe_load(stream)
 
@@ -37,28 +34,30 @@ flags.DEFINE_integer('d_model', 512, 'Dimension of the vecs in Transfomer layer,
 flags.DEFINE_integer('num_heads', 8, 'Number of attention heads')
 flags.DEFINE_integer('fc', 2048, 'Number neurons in the fully connected layer after attention')
 
-flags.DEFINE_integer('unique_labels', hyperparams['unique_labels'], 'Length of the label hot vec')
-flags.DEFINE_integer('unique_aminos', len(hyperparams['unique_aminos']), 'Length of the label hot vec')
+flags.DEFINE_integer('num_labels', len(hyperparams['available_goes']), 'Length of the label hot vec')
+flags.DEFINE_integer('num_aminos', len(hyperparams['unique_aminos']), 'Length of the label hot vec')
 flags.DEFINE_integer('max_length_aminos', hyperparams['max_length_aminos'], 'Length of the label hot vec')
+flags.DEFINE_integer('min_length_aminos', hyperparams['min_length_aminos'], 'Length of the label hot vec')
 
 flags.DEFINE_string('dataPath', 'prepare/data/', 'Path for the data')
-flags.DEFINE_string('mode', None, '\ntrain: to start training the model')
+flags.DEFINE_string('savedModelPath', 'train/savedModel', 'Path for the saved model')
+
+flags.DEFINE_string('mode', None, 'createdata: to create the tfrecords\ntrain: to start training the model\evaluate: to use the model for inference')
 flags.mark_flag_as_required('mode')
 
 FLAGS(sys.argv)
 
 import train.trainer as trainer
 import prepare.createDataset as createDataset
-import analyze.predictor as model
-
+import evaluate.evaluator as evaluator
 
 def main(argvs):
     if (FLAGS.mode=='createdata'):
         createDataset.createDataset()
     elif (FLAGS.mode=='train'):
         trainer.train()
-    elif (FLAGS.mode=='predict'):
-        model.predict()
+    elif (FLAGS.mode=='evaluate'):
+        evaluator.evaluate()
     else:
         print('No mode selected')
 

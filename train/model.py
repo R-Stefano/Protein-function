@@ -213,8 +213,9 @@ class Transformer(tf.keras.Model):
     
     x=self.flat(x)
     print('Shape after flatten it:', x.shape)
-    print('\n\n')
 
     final_output = self.final_layer(x)
+    print('Output shape:', final_output.shape)
+    print('\n\n')
     
     return final_output

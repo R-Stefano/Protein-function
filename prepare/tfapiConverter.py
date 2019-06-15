@@ -10,11 +10,9 @@ from absl import flags
 FLAGS = flags.FLAGS
 
 #get unique lables
-unique_labels=FLAGS.unique_labels
-
+unique_labels=FLAGS.num_labels
 #get the unique aminos
-unique_aminos=FLAGS.unique_aminos
-
+unique_aminos=FLAGS.num_aminos
 #get max length to use
 max_length_amino=FLAGS.max_length_aminos
 

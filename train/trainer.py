@@ -5,16 +5,18 @@ from absl import flags
 import time
 import numpy as np
 from tensorflow import keras
-import train.model as mod
 
+import train.model as mod
 import prepare.tfapiConverter as tfconv
-import analyze.custom_metrics as custom
+import evaluate.custom_metrics as custom
 
 FLAGS = flags.FLAGS
 
 dataPath=FLAGS.dataPath
-modelPath='./train/ckpt'
-model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.unique_labels)
+ckptsPath='train/ckpt'
+savedModelPath=FLAGS.savedModelPath
+logsPath='train/logs'
+model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
 
 loss_object = tf.keras.losses.BinaryCrossentropy()
 optimizer = tf.keras.optimizers.Adam()
@@ -91,18 +93,15 @@ def train():
     test_set = test_set.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=optimizer, net=model)
-    manager = tf.train.CheckpointManager(ckpt, modelPath, max_to_keep=3)
+    manager = tf.train.CheckpointManager(ckpt, ckptsPath, max_to_keep=3)
     ckpt.restore(manager.latest_checkpoint)
     if manager.latest_checkpoint:
         print("Restored from {}".format(manager.latest_checkpoint))
     else:
         print("Initializing from scratch.")
 
-    train_summary_writer = tf.summary.create_file_writer('train/logs/train')
-    test_summary_writer = tf.summary.create_file_writer('train/logs/test')
-    #train_summary_writer = tf.summary.create_file_writer('/tmp/summaries/train')
-    #with train_summary_writer.as_default():
-        #tf.summary.scalar('loss', avg_loss.result(), step=optimizer.iterations)
+    train_summary_writer = tf.summary.create_file_writer(os.path.join(logsPath, 'train'))
+    test_summary_writer = tf.summary.create_file_writer(os.path.join(logsPath, 'test'))
 
     for ep in range(1, FLAGS.epoches +1):
         print('\nEpoch ({}/{})'.format(ep, FLAGS.epoches))
@@ -110,7 +109,6 @@ def train():
         #training
         for i, batch in enumerate(train_set):
             train_step(batch['X'], batch['Y'])
-            ckpt.step.assign_add(1)
             
             if (i%200==0):
                 with train_summary_writer.as_default():
@@ -123,12 +121,12 @@ def train():
                     train_precision.reset_states()
                     train_recall.reset_states()
                     train_f1_max.reset_states()
-            break
+                    
+            ckpt.step.assign_add(1)            
 
         #testing
         for i, batch in enumerate(test_set):
             test_step(batch['X'], batch['Y'])
-            break
 
         with test_summary_writer.as_default():
             tf.summary.scalar('loss', test_loss.result(), step=int(ckpt.step))
@@ -147,7 +145,11 @@ def train():
         save_path = manager.save()
         print("Saved checkpoint | global step {}: {}".format(int(ckpt.step), save_path))
 
+        if (ep%10==0):
+            print('Saving weights')
+            model.save_weights(savedModelPath, save_format='tf')
+
     print('Saving final model..')
     #How to save a model developed using Imperative style
-    model.save_weights("train/saved_model/module_without_signature", save_format='tf')
+    model.save_weights(savedModelPath, save_format='tf')
         
