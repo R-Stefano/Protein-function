@@ -12,7 +12,7 @@ data = pd.read_csv("results_queries.csv", header=None)
 data.columns = ['sequence', 'reference', 'identity', '', '', '', '', '','','','e_value','bit_score']
 print(data.head(20))
 
-test_examples=142687
+test_examples=142688
 blast_ref_predictions_file=open('blast_ref_predictions.txt', 'w+')
 
 for i in range(test_examples):

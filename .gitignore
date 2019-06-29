@@ -3,7 +3,6 @@ extract/proteins_goes
 extract/proteins_seqs
 extract/uniprot-filtered-reviewed_yes.xml
 extract/.uniprot-filtered-reviewed_yes.xml.swp
-extract/go.obo
 prepare/data/*
 prepare/.ipynb_checkpoints/*
 train/ckpt/*

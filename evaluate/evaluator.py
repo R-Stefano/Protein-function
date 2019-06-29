@@ -129,5 +129,5 @@ def evaluate():
 
 		#keep tyrack of the results
 		updateMetrics(batch['Y'], blast_preds, model_preds)
-
+		
 	analysizeResults()
