@@ -65,6 +65,13 @@ def updateMetrics(y_true, y_pred_blast, y_pred_model):
 
 def preprocessBLASTpredictions():
 	'''
+	This function loads the BLAST predictions as GO notations and 
+	create the encoded predictions. 
+	For each example:
+	from GO:003248, GO:456392 -> [0,0,1,0,0,1]
+
+	Return:
+		a tensor of shape [dataset_size, num_go_labels]
 	'''
 	folder_path='evaluate/BLAST_baseline/blast_predictions/'
 	files_name=os.listdir(folder_path)
@@ -94,7 +101,9 @@ def evaluate():
 	#params
 	batch_size=64
 
+	#0. PREPARE BLAST PREDICTIONS
 	blast_predictions=preprocessBLASTpredictions()
+
 	#1. LOAD MODEL
 	version="version_1"
 	export_dir="evaluate/models/"+version+"/savedModel"
@@ -120,7 +129,5 @@ def evaluate():
 
 		#keep tyrack of the results
 		updateMetrics(batch['Y'], blast_preds, model_preds)
-
-		break
 
 	analysizeResults()
