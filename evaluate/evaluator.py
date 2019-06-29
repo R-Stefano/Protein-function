@@ -1,9 +1,14 @@
 from absl import flags
 import tensorflow as tf
-from tensorflow import keras
 import numpy as np
+import obonet
+import pickle
+import os
+import yaml
+
 import train.model as mod
 import evaluate.custom_metrics as custom
+import prepare.tfapiConverter as tfconv
 
 FLAGS = flags.FLAGS
 
@@ -23,27 +28,99 @@ how to make transformer in imperative
 https://www.tensorflow.org/beta/tutorials/text/transformer
 '''
 
+dataPath=FLAGS.dataPath
+
 thresholds=np.arange(start=0.1, stop=1.0, step=0.1)
-myMetric=custom.F1MaxScore(thresholds, name="train_f1_max")
-recall=tf.keras.metrics.Recall()
-precision=tf.keras.metrics.Precision()
+#BLAST metrics
+blast_myMetric=custom.F1MaxScore(thresholds, name="blast_f1_max")
+blast_recall=tf.keras.metrics.Recall()
+blast_precision=tf.keras.metrics.Precision()
+#Model metrics
+model_myMetric=custom.F1MaxScore(thresholds, name="model_f1_max")
+model_recall=tf.keras.metrics.Recall()
+model_precision=tf.keras.metrics.Precision()
+
+with open("hyperparams.yaml", 'r') as f:
+	hyperparams=yaml.safe_load(f)
+
+graph = obonet.read_obo('extract/go.obo')
+
+def analysizeResults():
+	print('BLAST f1 score:  {:.2f}'.format(blast_myMetric.result().numpy()))
+	print('BLAST recall:    {:.2f}'.format(blast_recall.result().numpy()))
+	print('BLAST precision: {:.2f}'.format(blast_precision.result().numpy()))
+	print('Model f1 score:  {:.2f}'.format(model_myMetric.result().numpy()))
+	print('Model recall:    {:.2f}'.format(model_recall.result().numpy()))
+	print('Model precision: {:.2f}'.format(model_precision.result().numpy()))
 
 @tf.function
-def updateMetrics(y_true, y_pred):
-	myMetric(y_true, y_pred)
-	recall(y_true, y_pred)
-	precision(y_true, y_pred)
+def updateMetrics(y_true, y_pred_blast, y_pred_model):
+	blast_myMetric(y_true, y_pred_blast)
+	blast_recall(y_true, y_pred_blast)
+	blast_precision(y_true, y_pred_blast)
 
+	model_myMetric(y_true, y_pred_model)
+	model_recall(y_true, y_pred_model)
+	model_precision(y_true, y_pred_model)
 
+def preprocessBLASTpredictions():
+	'''
+	'''
+	folder_path='evaluate/BLAST_baseline/blast_predictions/'
+	files_name=os.listdir(folder_path)
+
+	BLAST_results=[]
+	for f in files_name:
+		data_batch=pickle.load(open(folder_path+f, 'rb'))
+		for example in data_batch:
+			goes_idxs=[]
+			for go in example:
+				try:
+					goes_idxs.append(hyperparams['available_goes'].index(go))
+				except:
+					continue
+			#generate example encoded predictions
+			example_encoded=np.zeros((len(hyperparams['available_goes']))).astype(np.float32)
+			#assign 1 to the predicted go notations 
+			if len(goes_idxs)>0:
+				example_encoded[np.asarray(goes_idxs)]=1
+
+			BLAST_results.append(example_encoded)
+	
+	return np.asarray(BLAST_results)
+	
 
 def evaluate():
+	#params
+	batch_size=64
+
+	blast_predictions=preprocessBLASTpredictions()
+	#1. LOAD MODEL
 	version="version_1"
 	export_dir="evaluate/models/"+version+"/savedModel"
 	model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
 	model.load_weights(export_dir)
 
-	inputData=np.ones((1,512,25))
-	labelData=np.ones((1,3344), dtype=np.float32)
-	out=model.predict(inputData)
+	#2. LOAD TEST EXAMPLES
+	ex_folder=os.path.join(dataPath,'test/')
+	test_files=[ex_folder+fn for fn in os.listdir(ex_folder)]
+	dataset=tf.data.TFRecordDataset(test_files)
 
-	updateMetrics(labelData, out)
+	dataset= dataset.map(tfconv.decodeTFRecord)
+	dataset=dataset.batch(batch_size)
+
+	for idx, batch in enumerate(dataset):
+		start=idx*batch_size
+		end=start+batch_size
+
+		#BLAST prediction:
+		blast_preds=blast_predictions[start:end]
+		#DeepFunc model prediction:
+		model_preds=model.predict(batch['X'])
+
+		#keep tyrack of the results
+		updateMetrics(batch['Y'], blast_preds, model_preds)
+
+		break
+
+	analysizeResults()

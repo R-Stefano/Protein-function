@@ -1,35 +1,15 @@
 '''
-This scripts creates to be fed into the model.
+This script loads the raw data, clean them and prepare for training. 
 
-It convertes each amino acid sequence into a list of idexes.
-The indexes indicate the amino acid. such as [ARNDCA] -> [0,1,2,3,4,0]
+It convertes each amino acid sequence into a list of idexes. 
+The indexes indicate the amino acid. such as [ARNDCA] -> [0,1,2,3,4,0] 
 
-Same, it converts the go notations into a list of indexes.
-[GO1, GO2, GO3] -> [0,1,2]
+Same, it converts the go notations into a list of indexes. 
+[GO1, GO2, GO3] -> [0,1,2] 
 
-Finally, it creates train and test datasets.
+Then, it discards the examples that don't meet the criteria (max sequence length, Go notation)
 
-#move it the article
-the reason why I encoded as indexs and not directly as hot encode is to have a 
-dataset that weight only 200 MB compared to GBs. The hot-encoding is done 
-by tensorflow API when it fecth a batch of examples for training.
-
-To speed up training I could have stored already in hot vec but it would have 
-created a dataset of 6GB harder to move around. it has been only an implementation choice
-
-In order to create the hot encoding later on, I have to provide the number of 
-possible idxs. The possible idxs equals to the number of unique amino acids
-and the number of unique go notations.
-
-Some proteins have go notations not available in the go.obo file. If a protein 
-has any go notation match, the example is discarded
-
-Same for the sequences, if the sequence is longer than a given threshold,
-the example is discarded.
-
-Finally, only the examples that are not discarded both for go notation and max seq length
-are used for training and testing
-
+Finally, it creates train and test datasets in tfrecord format.
 '''
 import numpy as np
 import pickle
@@ -41,29 +21,7 @@ from sklearn.model_selection import train_test_split
 import prepare.tfapiConverter as tfconv
 
 FLAGS = flags.FLAGS
-
-
-'''
-the for loop is a lstm. The while must explicitly implement when get out of the loop, the for loop can keep going.
-
-No, maybe the while is better, it process internally, never output anything, are the others
-that read the internal state of the while. So, they must be processed in PARALLEL.
-
-it's like that each while loop is in charge of a thoughts-reading process. The loops try to 
-read other loops. 
-
-When they do it could be at each timestep or they output when to read. So, there is an 
-internal state which decides when reading if it exceed a given threshold.
-'''
-'''
-TODO:
-store in yaml file the list of unique aminos
-store in yaml file the max length to use
-
-no batch, load everything at once, then train test split and finall save.
-
-save in numpy format if it works. 
-'''
+file_batch_size=200000
 
 #save processed data on disk
 def prepareDataset(inputData, labelData, filename):
@@ -103,7 +61,7 @@ def preprocessLabels(goes_seqs, unique_goes):
             try:
                 hot_cat_seq.append(unique_goes.index(go))
             except:
-                #example goes not identified, discard it
+                #example gos not identified, discard it
                 continue
 
         if hot_cat_seq==[]:
@@ -168,7 +126,6 @@ def createDataset():
     unique_aminos=hyperparams['unique_aminos']
 
     tot_examples=0
-    file_batch_size=200000
     print('Creating dataset..')
     for startBatch in range(0, len(proteins_goes), file_batch_size):
         endBatch=startBatch+file_batch_size

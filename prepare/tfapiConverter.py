@@ -20,7 +20,7 @@ def generateTFRecord(examples_x, examples_y, filename):
     '''
     In a tf.train.Example, features can be only of 3 types:
         int64: int or bools
-        bytes: use this for text and matricies using tf.serialize_tensor
+        bytes: use this for text and TENSORS using numpy array-string converter
         float
     '''
     def _bytes_feature(value):
@@ -35,16 +35,22 @@ def generateTFRecord(examples_x, examples_y, filename):
         return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
     
     def serialize_example(input_example, label):
+        """
+        Creates a tf.Example
+
+        Args:
+            input (array): np.array
+            label (array): np.array
+
+        Return:
+            serialized proto example
+        """
         if (type(input_example)!=type(np.asarray([]))):
             input_example=np.asarray(input_example, dtype=np.uint8)
 
         if (type(label)!=type(np.asarray([]))):
             label=np.asarray(label, dtype=np.uint8)
-        """
-        Creates a tf.Example
-        input (array): np.array
-        label (array): np.array
-        """
+
         shapeInput=input_example.shape
         shapeLabel=label.shape
         features = {
@@ -83,10 +89,12 @@ def decodeTFRecord(example_proto):
     # Parse the input tf.Example proto using the dictionary above.
     example=tf.io.parse_single_example(example_proto, feature_description)
     
+    #one-hot encode amino acids
     decodeInput=tf.io.decode_raw(example['inputData'], tf.uint8)
     hot_input=tf.one_hot(decodeInput, tf.cast(example['hot_aminos'], tf.int32), dtype=tf.float32)
     inputData=tf.concat([hot_input, tf.zeros([example['pad_aminos'], example['hot_aminos']], tf.float32)], axis=0)
 
+    #one-hot encode gos notations
     decodeLabel=tf.io.decode_raw(example['labelData'], tf.uint8)
     hot_label=tf.one_hot(decodeLabel, tf.cast(example['hot_classes'], tf.int32), dtype=tf.float32)
     labelData=tf.math.reduce_max(hot_label, axis=0)
