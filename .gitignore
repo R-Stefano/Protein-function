@@ -10,6 +10,7 @@ train/logs/*
 train/savedModel/*
 evaluate/models/*
 evaluate/BLAST_baseline/uniprot_db/*
+evaluate/BLAST_baseline/full/*
 evaluate/BLAST_baseline/blast_predictions/*
 evaluate/BLAST_baseline/blast_ref_predictions.txt
 evaluate/BLAST_baseline/queries.fasta

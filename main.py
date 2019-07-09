@@ -34,7 +34,7 @@ flags.DEFINE_integer('d_model', 512, 'Dimension of the vecs in Transfomer layer,
 flags.DEFINE_integer('num_heads', 8, 'Number of attention heads')
 flags.DEFINE_integer('fc', 2048, 'Number neurons in the fully connected layer after attention')
 
-flags.DEFINE_integer('num_labels', len(hyperparams['available_goes']), 'Length of the label hot vec')
+flags.DEFINE_integer('num_labels', len(hyperparams['available_gos']), 'Length of the label hot vec')
 flags.DEFINE_integer('num_aminos', len(hyperparams['unique_aminos']), 'Length of the label hot vec')
 flags.DEFINE_integer('max_length_aminos', hyperparams['max_length_aminos'], 'Length of the label hot vec')
 flags.DEFINE_integer('min_length_aminos', hyperparams['min_length_aminos'], 'Length of the label hot vec')

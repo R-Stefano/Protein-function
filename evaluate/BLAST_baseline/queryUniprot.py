@@ -18,7 +18,7 @@ for idx, line in enumerate(blast_ref_predictions):
         goes_list=[]
     else:
         print('\n\nObtaining GOs for', ref)
-        res=service.search(ref, frmt="tab", columns="go")
+        res=service.search(ref + ' reviewed:yes', frmt="tab", columns="go")
         #print('Result:\n'+res)
         
         goes_list=[]

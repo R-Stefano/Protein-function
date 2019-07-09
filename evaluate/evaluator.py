@@ -28,6 +28,7 @@ how to make transformer in imperative
 https://www.tensorflow.org/beta/tutorials/text/transformer
 '''
 
+'''
 dataPath=FLAGS.dataPath
 
 thresholds=np.arange(start=0.1, stop=1.0, step=0.1)
@@ -45,6 +46,14 @@ with open("hyperparams.yaml", 'r') as f:
 
 graph = obonet.read_obo('extract/go.obo')
 
+#Assign GO class to each GO term: 0: , 1: , 2:
+GOClasses=[]
+for go_term in hyperparams['available_goes']:
+	GOClasses.append(graph.node[go_term]['namespace'])
+
+print(GOClasses)
+'''
+
 def analysizeResults():
 	print('BLAST f1 score:  {:.2f}'.format(blast_myMetric.result().numpy()))
 	print('BLAST recall:    {:.2f}'.format(blast_recall.result().numpy()))
@@ -54,14 +63,14 @@ def analysizeResults():
 	print('Model precision: {:.2f}'.format(model_precision.result().numpy()))
 
 @tf.function
-def updateMetrics(y_true, y_pred_blast, y_pred_model):
+def updateMetrics(y_true, y_pred_blast):#, y_pred_model):
 	blast_myMetric(y_true, y_pred_blast)
 	blast_recall(y_true, y_pred_blast)
 	blast_precision(y_true, y_pred_blast)
 
-	model_myMetric(y_true, y_pred_model)
-	model_recall(y_true, y_pred_model)
-	model_precision(y_true, y_pred_model)
+	#model_myMetric(y_true, y_pred_model)
+	#model_recall(y_true, y_pred_model)
+	#model_precision(y_true, y_pred_model)
 
 def preprocessBLASTpredictions():
 	'''
@@ -97,7 +106,7 @@ def preprocessBLASTpredictions():
 	return np.asarray(BLAST_results)
 	
 
-def evaluate():
+def evaluate_old():
 	#params
 	batch_size=64
 
@@ -105,10 +114,10 @@ def evaluate():
 	blast_predictions=preprocessBLASTpredictions()
 
 	#1. LOAD MODEL
-	version="version_1"
-	export_dir="evaluate/models/"+version+"/savedModel"
-	model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
-	model.load_weights(export_dir)
+	#version="version_1"
+	#export_dir="evaluate/models/"+version+"/savedModel"
+	#model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
+	#model.load_weights(export_dir)
 
 	#2. LOAD TEST EXAMPLES
 	ex_folder=os.path.join(dataPath,'test/')
@@ -119,15 +128,81 @@ def evaluate():
 	dataset=dataset.batch(batch_size)
 
 	for idx, batch in enumerate(dataset):
-		start=idx*batch_size
-		end=start+batch_size
+		if idx==7:
+			start=idx*batch_size
+			end=start+52
 
+			batch['Y']=batch['Y'][:52]
+		elif idx>7:
+			break
+		else:	
+			start=idx*batch_size
+			end=start+batch_size
+		
 		#BLAST prediction:
 		blast_preds=blast_predictions[start:end]
 		#DeepFunc model prediction:
-		model_preds=model.predict(batch['X'])
+		#model_preds=model.predict(batch['X'])
 
 		#keep tyrack of the results
-		updateMetrics(batch['Y'], blast_preds, model_preds)
-		
+		updateMetrics(batch['Y'], blast_preds)#, model_preds)
+
 	analysizeResults()
+
+def extractPredictedGOs(prediction):
+	'''
+	This function maps the prediction to the GO ids.
+	TODO:
+	-Allow to proces multiple examples
+	Args:
+		prediction (array): 
+	
+	Returns:
+		An array of shape num_goes, 1 of the GO ids predicted.
+
+	'''
+	idxs=np.argwhere(prediction>0.8)
+
+	GOids= np.asarray(hyperparams['available_goes'])
+	print(GOids[idxs].shape)
+
+	return np.reshape(GOids[idxs], -1)
+
+def assignGOMainClass(goterms):
+	'''
+	This function label each GO term predicted 
+	'''
+	graph.node[goterms[0]]
+
+def evaluate():
+	#params
+	batch_size=64
+
+	#1. LOAD MODEL
+	#version="version_1"
+	#export_dir="evaluate/models/"+version+"/savedModel"
+	#model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
+	#model.load_weights(export_dir)
+
+	#2. LOAD TEST EXAMPLES
+	ex_folder=os.path.join(dataPath,'test/')
+	test_files=[ex_folder+fn for fn in os.listdir(ex_folder)]
+	dataset=tf.data.TFRecordDataset(test_files)
+
+	dataset= dataset.map(tfconv.decodeTFRecord)
+	dataset=dataset.batch(batch_size)
+
+	for idx, batch in enumerate(dataset):
+		#DeepFunc model prediction:
+		#model_preds=model.predict(batch['X'])
+
+		model_preds=np.random.randn(64, 3344)
+		#Return the GO term's IDs
+		GOterms=extractPredictedGOs(model_preds[0])
+		print(batch['Y'])
+		break
+
+		#keep tyrack of the results
+		#updateMetrics(batch['Y'], blast_preds)#, model_preds)
+
+	#analysizeResults()

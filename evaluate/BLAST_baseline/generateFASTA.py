@@ -56,6 +56,9 @@ dataset=dataset.batch(1)
 
 count=0
 for idx, batch in enumerate(dataset):
-	BLASTPrediction(batch['X'].numpy(), idx)
-	count=idx
+    if idx==500:
+        break
+
+    BLASTPrediction(batch['X'].numpy(), idx)
+    count=idx
 print('Number of test sequences (starting from 0):', count)

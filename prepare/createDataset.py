@@ -27,7 +27,7 @@ file_batch_size=200000
 def prepareDataset(inputData, labelData, filename):
     print('Saving', filename)
 
-    X_train, X_test, y_train, y_test = train_test_split(inputData, labelData, test_size=0.33, random_state=0)
+    X_train, X_test, y_train, y_test = train_test_split(inputData, labelData, test_size=0.2, random_state=0)
 
     tfconv.generateTFRecord(X_train, y_train, 'prepare/data/train/'+filename+'.tfrecords')
     tfconv.generateTFRecord(X_test, y_test, 'prepare/data/test/'+filename+'.tfrecords')
@@ -40,13 +40,15 @@ def applyMask(dirtyData, dirty_idxs):
 
     return returnData
 
-def preprocessLabels(goes_seqs, unique_goes):
+def preprocessLabels(goes_seqs, unique_goes, mapped_goes):
     '''
     This function index the go notations for each sequence
 
     Args:
         goes_seques (list): each element is a list of go notations for a protein
         unique_goes (list): list of unique goes
+        mapped_goes (dictionary): a dictionary where the key is a go subterm and the value is a list of 
+                                  labels. The labels are the parents GOs of the key GO
     
     Return:
         hot_cats_seqs (list): each element is a list of indexed go notations
@@ -58,11 +60,16 @@ def preprocessLabels(goes_seqs, unique_goes):
     for i, goes_list in enumerate(goes_seqs):
         hot_cat_seq=[]
         for go in goes_list:
-            try:
+            if go in unique_goes:
                 hot_cat_seq.append(unique_goes.index(go))
-            except:
-                #example gos not identified, discard it
-                continue
+            elif go in mapped_goes:
+                #the go is a subterm, retrieve the labels
+                labels=mapped_goes[go]
+                for label in labels:
+                    hot_cat_seq.append(unique_goes.index(label))
+            else:
+                #go not identified, discard it
+                print('go not available in the GO ontology')
 
         if hot_cat_seq==[]:
             mask.append(True)
@@ -120,7 +127,10 @@ def createDataset():
         hyperparams = yaml.safe_load(stream)
 
     #get unique goes as list
-    unique_goes=hyperparams['available_goes']
+    unique_goes=hyperparams['available_gos']
+
+    #get mapped gos subterms as dictionary subterm: [labels]
+    mapped_goes=hyperparams['mapped_gos']
 
     #get the unique aminos
     unique_aminos=hyperparams['unique_aminos']
@@ -135,7 +145,7 @@ def createDataset():
 
         #Labels: return [seqs, hot_vec]
         print('Preprocessing labels..')
-        dirty_labelData, mask_empty_examples=preprocessLabels(batch_proteins_goes, unique_goes)
+        dirty_labelData, mask_empty_examples=preprocessLabels(batch_proteins_goes, unique_goes, mapped_goes)
 
         #Inputs: return [seqs, num_aminos, hot_vec]
         print('Preprocessing input data..')

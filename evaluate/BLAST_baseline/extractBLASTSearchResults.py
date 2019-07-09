@@ -12,7 +12,7 @@ data = pd.read_csv("results_queries.csv", header=None)
 data.columns = ['sequence', 'reference', 'identity', '', '', '', '', '','','','e_value','bit_score']
 print(data.head(20))
 
-test_examples=142688
+test_examples=500#142688
 blast_ref_predictions_file=open('blast_ref_predictions.txt', 'w+')
 
 for i in range(test_examples):
@@ -24,7 +24,7 @@ for i in range(test_examples):
         if (int(first_res['identity'])==100):
             #exclude first result, otherwise blast results will be 100% accurate
             second_res=seq_res.iloc[1]
-            seq_ref_res=second_res['reference']        
+            seq_ref_res=second_res['reference']    
         else:
             seq_ref_res=first_res['reference']
         

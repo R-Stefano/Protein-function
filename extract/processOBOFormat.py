@@ -1,5 +1,4 @@
 import obonet
-import networkx
 import pickle
 
 '''
