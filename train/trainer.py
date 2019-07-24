@@ -6,7 +6,7 @@ import time
 import numpy as np
 from tensorflow import keras
 
-import train.model as mod
+import models.model_2 as model
 import prepare.tfapiConverter as tfconv
 import evaluate.custom_metrics as custom
 
@@ -16,7 +16,7 @@ dataPath=FLAGS.dataPath
 ckptsPath='train/ckpt'
 savedModelPath=FLAGS.savedModelPath
 logsPath='train/logs'
-model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
+model=model.Model()
 
 loss_object = tf.keras.losses.BinaryCrossentropy()
 optimizer = tf.keras.optimizers.Adam()

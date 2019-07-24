@@ -6,7 +6,7 @@ import pickle
 import os
 import yaml
 
-import train.model as mod
+import models.model_1 as model
 import evaluate.custom_metrics as custom
 import prepare.tfapiConverter as tfconv
 
@@ -26,51 +26,115 @@ https://medium.com/tensorflow/a-transformer-chatbot-tutorial-with-tensorflow-2-0
 
 how to make transformer in imperative
 https://www.tensorflow.org/beta/tutorials/text/transformer
+
+This script is used to assess the quality of the model's 
+predictios using the metrics defined in the CAFA challenge.
+
+TODO:
+-Define and add term-centri metric
+-Threshold for predictions to 1 or 0. pred_threshold. Which value should have? 
 '''
 
-'''
 dataPath=FLAGS.dataPath
-
-thresholds=np.arange(start=0.1, stop=1.0, step=0.1)
-#BLAST metrics
-blast_myMetric=custom.F1MaxScore(thresholds, name="blast_f1_max")
-blast_recall=tf.keras.metrics.Recall()
-blast_precision=tf.keras.metrics.Precision()
-#Model metrics
-model_myMetric=custom.F1MaxScore(thresholds, name="model_f1_max")
-model_recall=tf.keras.metrics.Recall()
-model_precision=tf.keras.metrics.Precision()
+pred_threshold=0.8
+model_version="version_1"
 
 with open("hyperparams.yaml", 'r') as f:
 	hyperparams=yaml.safe_load(f)
 
-graph = obonet.read_obo('extract/go.obo')
+graph = obonet.read_obo('extract/go-basic.obo')
 
-#Assign GO class to each GO term: 0: , 1: , 2:
-GOClasses=[]
-for go_term in hyperparams['available_goes']:
-	GOClasses.append(graph.node[go_term]['namespace'])
+thresholds=np.arange(start=0.1, stop=1.0, step=0.1)
 
-print(GOClasses)
-'''
+#1. PROTEIN-CENTRIC METRICS
+#BLAST metrics
+#blast_myMetric=custom.F1MaxScore(thresholds, name="blast_f1_max")
+#blast_recall=tf.keras.metrics.Recall()
+#blast_precision=tf.keras.metrics.Precision()
+#Model metrics
+model_f1max=custom.F1MaxScore(thresholds, name="model_f1_max")
+model_recall=tf.keras.metrics.Recall()
+model_precision=tf.keras.metrics.Precision()
 
-def analysizeResults():
-	print('BLAST f1 score:  {:.2f}'.format(blast_myMetric.result().numpy()))
-	print('BLAST recall:    {:.2f}'.format(blast_recall.result().numpy()))
-	print('BLAST precision: {:.2f}'.format(blast_precision.result().numpy()))
-	print('Model f1 score:  {:.2f}'.format(model_myMetric.result().numpy()))
+#2. TERM-CENTRIC METRICS
+
+#3. GO CLASS-CENTRIC METRICS
+#Map each GO term (label) to its GO Class.
+#Each GO class contains the labels idxs of the GO term belonging to the class.
+#Used to evaluate the predictions for each GO class
+go_classes_idxs={
+	'cellular_component':[],
+	'biological_process':[],
+	'molecular_function':[]
+}
+
+for idx, go_term in enumerate(hyperparams['available_gos']):
+	go_classes_idxs[graph.node[go_term]['namespace']].append(idx)
+
+#Stores the 3 metrics for each go class
+go_classes_metrics={
+	'cellular_component':{},
+	'biological_process':{},
+	'molecular_function':{}
+}
+
+#Create the 3 metrics for each go class
+for go_class in go_classes_metrics:
+	go_classes_metrics[go_class]['f1_max']=custom.F1MaxScore(thresholds, name=go_class+"_f1_max")
+	go_classes_metrics[go_class]['recall']=tf.keras.metrics.Recall(name=go_class+"_recall")
+	go_classes_metrics[go_class]['precision']=tf.keras.metrics.Precision(name=go_class+"_precision")
+
+def protein_centric_metric(y_true, y_pred):
+	model_f1max(y_true, y_pred)
+	model_recall(y_true, y_pred)
+	model_precision(y_true, y_pred)
+
+def go_class_centric_metric(y_true, y_pred):
+	'''
+	This function computes the F1 max score, precision and recall for BP, CC and MF
+
+	'''
+
+	bp_idxs=np.asarray(go_classes_idxs['biological_process'])
+	cc_idxs=np.asarray(go_classes_idxs['cellular_component'])
+	mf_idxs=np.asarray(go_classes_idxs['molecular_function'])
+
+	#get predictions and labels for each go class
+	y_trues_bp=np.transpose(np.transpose(y_true)[bp_idxs])
+	y_trues_cc=np.transpose(np.transpose(y_true)[cc_idxs])
+	y_trues_mf=np.transpose(np.transpose(y_true)[mf_idxs])
+
+	y_preds_bp=np.transpose(np.transpose(y_pred)[bp_idxs])
+	y_preds_cc=np.transpose(np.transpose(y_pred)[cc_idxs])
+	y_preds_mf=np.transpose(np.transpose(y_pred)[mf_idxs])
+
+	#Update the metrics
+	for metric_name in go_classes_metrics['cellular_component']:
+		metric_obj=go_classes_metrics['cellular_component'][metric_name]
+		metric_obj(y_trues_cc, y_preds_cc)
+
+	for metric_name in go_classes_metrics['biological_process']:
+		metric_obj=go_classes_metrics['biological_process'][metric_name]
+		metric_obj(y_trues_bp, y_preds_bp)
+	
+	for metric_name in go_classes_metrics['molecular_function']:
+		metric_obj=go_classes_metrics['molecular_function'][metric_name]
+		metric_obj(y_trues_mf, y_preds_mf)
+
+def displayResults():
+	print('\n\nRESULTS:\n')
+	print('Protein-centric results:')
+	print('Model f1_max score:  {:.2f}'.format(model_f1max.result().numpy()))
 	print('Model recall:    {:.2f}'.format(model_recall.result().numpy()))
 	print('Model precision: {:.2f}'.format(model_precision.result().numpy()))
 
-@tf.function
-def updateMetrics(y_true, y_pred_blast):#, y_pred_model):
-	blast_myMetric(y_true, y_pred_blast)
-	blast_recall(y_true, y_pred_blast)
-	blast_precision(y_true, y_pred_blast)
-
-	#model_myMetric(y_true, y_pred_model)
-	#model_recall(y_true, y_pred_model)
-	#model_precision(y_true, y_pred_model)
+	print('\nGO class-centric results:')
+	for go_class in go_classes_metrics:
+		print(go_class)
+		for metric_name in go_classes_metrics[go_class]:
+			metric_obj=go_classes_metrics[go_class][metric_name]
+			print('> '+metric_name, ' {:.2f}'.format(metric_obj.result().numpy()))
+		print('\n')
 
 def preprocessBLASTpredictions():
 	'''
@@ -106,81 +170,34 @@ def preprocessBLASTpredictions():
 	return np.asarray(BLAST_results)
 	
 
-def evaluate_old():
-	#params
-	batch_size=64
-
-	#0. PREPARE BLAST PREDICTIONS
-	blast_predictions=preprocessBLASTpredictions()
-
-	#1. LOAD MODEL
-	#version="version_1"
-	#export_dir="evaluate/models/"+version+"/savedModel"
-	#model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
-	#model.load_weights(export_dir)
-
-	#2. LOAD TEST EXAMPLES
-	ex_folder=os.path.join(dataPath,'test/')
-	test_files=[ex_folder+fn for fn in os.listdir(ex_folder)]
-	dataset=tf.data.TFRecordDataset(test_files)
-
-	dataset= dataset.map(tfconv.decodeTFRecord)
-	dataset=dataset.batch(batch_size)
-
-	for idx, batch in enumerate(dataset):
-		if idx==7:
-			start=idx*batch_size
-			end=start+52
-
-			batch['Y']=batch['Y'][:52]
-		elif idx>7:
-			break
-		else:	
-			start=idx*batch_size
-			end=start+batch_size
-		
-		#BLAST prediction:
-		blast_preds=blast_predictions[start:end]
-		#DeepFunc model prediction:
-		#model_preds=model.predict(batch['X'])
-
-		#keep tyrack of the results
-		updateMetrics(batch['Y'], blast_preds)#, model_preds)
-
-	analysizeResults()
-
-def extractPredictedGOs(prediction):
+def extractPredictedGOs(predictions):
 	'''
-	This function maps the prediction to the GO ids.
-	TODO:
-	-Allow to proces multiple examples
+	This function maps the predictions to the GO idxs.
+
 	Args:
-		prediction (array): 
+		predictions (array): an array of shape [batch_size, num_labels]
 	
 	Returns:
-		An array of shape num_goes, 1 of the GO ids predicted.
+		An array of shape batch_size, go_terms_predicted with the GO id terms
 
 	'''
-	idxs=np.argwhere(prediction>0.8)
+	idxs=np.where(predictions>pred_threshold, 1, 0)
 
-	GOids= np.asarray(hyperparams['available_goes'])
-	print(GOids[idxs].shape)
+	go_terms_predictions=[]
+	for pred_idxs in idxs:
+		GO_terms_predicted= np.asarray(hyperparams['available_gos'])[np.reshape(np.argwhere(pred_idxs==1), -1)]
+		go_terms_predictions.append(GO_terms_predicted)
 
-	return np.reshape(GOids[idxs], -1)
+	return go_terms_predictions
 
-def assignGOMainClass(goterms):
-	'''
-	This function label each GO term predicted 
-	'''
-	graph.node[goterms[0]]
+
 
 def evaluate():
 	#params
 	batch_size=64
 
 	#1. LOAD MODEL
-	#version="version_1"
-	#export_dir="evaluate/models/"+version+"/savedModel"
+	#export_dir="evaluate/models/"+model_version+"/savedModel"
 	#model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
 	#model.load_weights(export_dir)
 
@@ -196,13 +213,15 @@ def evaluate():
 		#DeepFunc model prediction:
 		#model_preds=model.predict(batch['X'])
 
-		model_preds=np.random.randn(64, 3344)
-		#Return the GO term's IDs
-		GOterms=extractPredictedGOs(model_preds[0])
-		print(batch['Y'])
+		model_preds=np.random.random(size=(64, 1918)).astype(np.float32)
+
+		extractPredictedGOs(model_preds)
+
+		#NOT NEEDED. Metrics already squash RIGHT(?) squash predictions to 0 or 1 based on threshold
+		#model_preds=np.where(model_preds > pred_threshold, 1, 0)
+		protein_centric_metric(batch['Y'], model_preds)
+		#2. term_centric_metric(batch['Y'], model_preds)
+		go_class_centric_metric(batch['Y'], model_preds)
 		break
 
-		#keep tyrack of the results
-		#updateMetrics(batch['Y'], blast_preds)#, model_preds)
-
-	#analysizeResults()
+	displayResults()
