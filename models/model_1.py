@@ -2,7 +2,7 @@ import tensorflow as tf
 import models.utils as utils
 
 class Model(tf.keras.Model):
-  def __init__(self, num_layers, d_model, num_heads, dff, target_size, rate=0.1):
+  def __init__(self):
     super(Model, self).__init__()
     '''
     This class is used to mix togheter different architecture layers. 
@@ -23,7 +23,7 @@ class Model(tf.keras.Model):
     d_model=num_heads*head_vec
     fc=2048
 
-    self.trans_layers=[TransformerLayer(d_model, num_heads, fc) for _ in range(self.num_trans_layers)]
+    self.trans_layers=[utils.TransformerLayer(d_model, num_heads, fc) for _ in range(self.num_trans_layers)]
 
     #CNN
     layers=[

@@ -6,7 +6,6 @@ import time
 import numpy as np
 from tensorflow import keras
 
-import models.model_2 as model
 import prepare.tfapiConverter as tfconv
 import evaluate.custom_metrics as custom
 
@@ -16,7 +15,6 @@ dataPath=FLAGS.dataPath
 ckptsPath='train/ckpt'
 savedModelPath=FLAGS.savedModelPath
 logsPath='train/logs'
-model=model.Model()
 
 loss_object = tf.keras.losses.BinaryCrossentropy()
 optimizer = tf.keras.optimizers.Adam()
@@ -36,33 +34,32 @@ test_precision= tf.keras.metrics.Precision(name='test_precision')
 test_recall= tf.keras.metrics.Recall(name='test_recall')
 test_f1_max=custom.F1MaxScore(thresholds, name="test_f1_max")
 
+def train(model):
+    @tf.function
+    def train_step(x_batch, y_batch):
+        #GradientTape traces operations to compute gradients later
+        with tf.GradientTape() as tape:
+            predictions = model(x_batch)
+            loss = loss_object(y_batch, predictions)
 
-@tf.function
-def train_step(x_batch, y_batch):
-    #GradientTape traces operations to compute gradients later
-    with tf.GradientTape() as tape:
+        gradients = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+        train_loss(loss)
+        train_precision(y_batch, predictions)
+        train_recall(y_batch, predictions)
+        train_f1_max(y_batch, predictions)
+
+    @tf.function
+    def test_step(x_batch, y_batch):
         predictions = model(x_batch)
-        loss = loss_object(y_batch, predictions)
+        t_loss = loss_object(y_batch, predictions)
 
-    gradients = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        test_loss(t_loss)
+        test_precision(y_batch, predictions)
+        test_recall(y_batch, predictions)
+        test_f1_max(y_batch, predictions)
 
-    train_loss(loss)
-    train_precision(y_batch, predictions)
-    train_recall(y_batch, predictions)
-    train_f1_max(y_batch, predictions)
-
-@tf.function
-def test_step(x_batch, y_batch):
-    predictions = model(x_batch)
-    t_loss = loss_object(y_batch, predictions)
-
-    test_loss(t_loss)
-    test_precision(y_batch, predictions)
-    test_recall(y_batch, predictions)
-    test_f1_max(y_batch, predictions)
-
-def train():
     train_path=dataPath+'train/'
     test_path=dataPath+'test/'
     train_files=[train_path+fn for fn in os.listdir(train_path)]

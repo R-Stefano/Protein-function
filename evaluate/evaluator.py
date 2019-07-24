@@ -5,8 +5,8 @@ import obonet
 import pickle
 import os
 import yaml
+import importlib.util
 
-import models.model_1 as model
 import evaluate.custom_metrics as custom
 import prepare.tfapiConverter as tfconv
 
@@ -37,7 +37,8 @@ TODO:
 
 dataPath=FLAGS.dataPath
 pred_threshold=0.8
-model_version="version_1"
+model_version="version_2"
+modelPath='evaluate/models/'+model_version
 
 with open("hyperparams.yaml", 'r') as f:
 	hyperparams=yaml.safe_load(f)
@@ -123,12 +124,12 @@ def go_class_centric_metric(y_true, y_pred):
 
 def displayResults():
 	print('\n\nRESULTS:\n')
-	print('Protein-centric results:')
+	print('1. Protein-centric results:')
 	print('Model f1_max score:  {:.2f}'.format(model_f1max.result().numpy()))
 	print('Model recall:    {:.2f}'.format(model_recall.result().numpy()))
 	print('Model precision: {:.2f}'.format(model_precision.result().numpy()))
 
-	print('\nGO class-centric results:')
+	print('\n3. GO class-centric results:')
 	for go_class in go_classes_metrics:
 		print(go_class)
 		for metric_name in go_classes_metrics[go_class]:
@@ -136,40 +137,24 @@ def displayResults():
 			print('> '+metric_name, ' {:.2f}'.format(metric_obj.result().numpy()))
 		print('\n')
 
-def preprocessBLASTpredictions():
-	'''
-	This function loads the BLAST predictions as GO notations and 
-	create the encoded predictions. 
-	For each example:
-	from GO:003248, GO:456392 -> [0,0,1,0,0,1]
+	results={
+		'model':model_version,
+		'protein_centric': {
+			'f1':model_f1max.result().numpy(),
+			'recall':model_recall.result().numpy(),
+			'precision': model_precision.result().numpy()},
+		'GO_class_centric': {}
+	}
 
-	Return:
-		a tensor of shape [dataset_size, num_go_labels]
-	'''
-	folder_path='evaluate/BLAST_baseline/blast_predictions/'
-	files_name=os.listdir(folder_path)
+	for go_class in go_classes_metrics:
+		results['GO_class_centric'][go_class]={}
+		for metric_name in go_classes_metrics[go_class]:
+			metric_obj=go_classes_metrics[go_class][metric_name]
+			results['GO_class_centric'][go_class][metric_name]=metric_obj.result().numpy()
 
-	BLAST_results=[]
-	for f in files_name:
-		data_batch=pickle.load(open(folder_path+f, 'rb'))
-		for example in data_batch:
-			goes_idxs=[]
-			for go in example:
-				try:
-					goes_idxs.append(hyperparams['available_goes'].index(go))
-				except:
-					continue
-			#generate example encoded predictions
-			example_encoded=np.zeros((len(hyperparams['available_goes']))).astype(np.float32)
-			#assign 1 to the predicted go notations 
-			if len(goes_idxs)>0:
-				example_encoded[np.asarray(goes_idxs)]=1
-
-			BLAST_results.append(example_encoded)
+	with open(modelPath+"/results", 'wb') as f:
+		pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
 	
-	return np.asarray(BLAST_results)
-	
-
 def extractPredictedGOs(predictions):
 	'''
 	This function maps the predictions to the GO idxs.
@@ -197,9 +182,11 @@ def evaluate():
 	batch_size=64
 
 	#1. LOAD MODEL
-	#export_dir="evaluate/models/"+model_version+"/savedModel"
-	#model=mod.Transformer(num_layers=FLAGS.num_layers, d_model=FLAGS.d_model, num_heads=FLAGS.num_heads, dff=FLAGS.fc, target_size=FLAGS.num_labels)
-	#model.load_weights(export_dir)
+	spec = importlib.util.spec_from_file_location("module.name", modelPath+"/model.py")
+	netModule = importlib.util.module_from_spec(spec)
+	spec.loader.exec_module(netModule)
+	model=netModule.Model()
+	model.load_weights(modelPath+"/savedModel")
 
 	#2. LOAD TEST EXAMPLES
 	ex_folder=os.path.join(dataPath,'test/')
@@ -211,14 +198,11 @@ def evaluate():
 
 	for idx, batch in enumerate(dataset):
 		#DeepFunc model prediction:
-		#model_preds=model.predict(batch['X'])
+		model_preds=model.predict(batch['X'])
 
-		model_preds=np.random.random(size=(64, 1918)).astype(np.float32)
+		#model_preds=np.random.random(size=(64, 1918)).astype(np.float32)
 
-		extractPredictedGOs(model_preds)
-
-		#NOT NEEDED. Metrics already squash RIGHT(?) squash predictions to 0 or 1 based on threshold
-		#model_preds=np.where(model_preds > pred_threshold, 1, 0)
+		#3 METRICS:
 		protein_centric_metric(batch['Y'], model_preds)
 		#2. term_centric_metric(batch['Y'], model_preds)
 		go_class_centric_metric(batch['Y'], model_preds)

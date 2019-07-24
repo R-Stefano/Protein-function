@@ -50,12 +50,14 @@ FLAGS(sys.argv)
 import train.trainer as trainer
 import prepare.createDataset as createDataset
 import evaluate.evaluator as evaluator
+import models.model_3 as model
 
 def main(argvs):
+    net=model.Model()
     if (FLAGS.mode=='createdata'):
         createDataset.createDataset()
     elif (FLAGS.mode=='train'):
-        trainer.train()
+        trainer.train(net)
     elif (FLAGS.mode=='evaluate'):
         evaluator.evaluate()
     else:
