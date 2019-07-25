@@ -10,14 +10,14 @@ class Model(tf.keras.Model):
 
     #CNN
     self.conv_layers=[
-        utils.ResidualLayer(conv_type=conv_type, num_filters=64 ,filter_size=9, pooling=True),
-        utils.ResidualLayer(conv_type=conv_type, num_filters=128 ,filter_size=9, pooling=True),
-        utils.ConvLayer(conv_type=conv_type, num_filters=256 ,filter_size=9),
-        utils.ResidualLayer(conv_type=conv_type, num_filters=256 ,filter_size=9, pooling=True),
-        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9),
-        utils.ResidualLayer(conv_type=conv_type, num_filters=512 ,filter_size=9, pooling=True),
-        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9),
-        utils.ResidualLayer(conv_type=conv_type, num_filters=512 ,filter_size=9, pooling=True)
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=256 ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9, stride=2)
     ]
 
     #FLAT
