@@ -6,28 +6,42 @@ class Model(tf.keras.Model):
     super(Model, self).__init__()
 
     num_labels=1918
+    conv_type='1d' #sequential data: [batch, seq, vec]
 
     #CNN
-    layers=[
-        {'n':2, 'filters':32, 'kernel':9, 'padding':'SAME', 'stride':2},
-        {'n':3, 'filters':64, 'kernel':9, 'padding':'SAME', 'stride':2},
-        {'n':3, 'filters':128, 'kernel':9, 'padding':'SAME', 'stride':2}
+    self.conv_layers=[
+        utils.ConvLayer(conv_type=conv_type, num_filters=64 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64 ,filter_size=9, pooling=True),
+        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9, pooling=True),
+        utils.ConvLayer(conv_type=conv_type, num_filters=256 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=256 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=256 ,filter_size=9, pooling=True),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9, pooling=True),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9, pooling=True)
     ]
-    self.conv_layers=[]
-    for layer_def in layers:
-        for _ in range(layer_def['n']):
-            self.conv_layers.append(utils.Conv1DLayer(layer_def['filters'], layer_def['kernel'], layer_def['padding'], layer_def['stride']))
 
     #FLAT
     self.flat=tf.keras.layers.Flatten()
 
     #FC
-    self.final_layer = tf.keras.layers.Dense(num_labels, activation='sigmoid')
+    self.fc_layers=[
+      tf.keras.layers.Dense(4096, activation='relu'),
+      tf.keras.layers.Dense(1024, activation='relu'),
+      tf.keras.layers.Dense(num_labels, activation='sigmoid')
+    ]
+    
 
   def call(self, x):
     for layer in self.conv_layers:
         x=layer(x)
 
     x=self.flat(x)
-    x=self.final_layer(x)
+
+    for layer in self.fc_layers:
+      x=layer(x)
     return x

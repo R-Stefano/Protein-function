@@ -50,7 +50,7 @@ FLAGS(sys.argv)
 import train.trainer as trainer
 import prepare.createDataset as createDataset
 import evaluate.evaluator as evaluator
-import models.model_3 as model
+import models.model_2 as model
 
 def main(argvs):
     net=model.Model()

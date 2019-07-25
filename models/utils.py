@@ -1,43 +1,75 @@
 import tensorflow as tf
-class Conv1DLayer(tf.keras.layers.Layer):
-  def __init__(self, num_filters, filter_size, padding, stride):
-    super(Conv1DLayer, self).__init__()
+class ConvLayer(tf.keras.layers.Layer):
+  def __init__(self, conv_type, num_filters, filter_size, padding='SAME', stride=1, activation=True, pooling=False):
+    super(ConvLayer, self).__init__()
     '''
     Called to inizialize a convolution layer. The convolution layer consists of:
-    -convolution 
+    -convolution (1D|2D)
     -batch normalization
-    -activation function
+    -activation function (optional)
+    -max pooling (1D|2D) (optional)
     '''
+    self.applyActivation=activation
+    self.applyPooling=pooling
 
-    self.conv=tf.keras.layers.Conv1D(num_filters, filter_size, padding=padding, strides=stride)
+    if (conv_type=='1d'):
+      self.conv=tf.keras.layers.Conv1D(num_filters, filter_size, padding=padding, strides=stride)
+    else:
+      self.conv=tf.keras.layers.Conv2D(num_filters, filter_size, padding=padding, strides=stride)
+
     self.norm=tf.keras.layers.BatchNormalization()
+    
     self.activation=tf.keras.activations.relu
+
+    if (conv_type=='1d'):
+      self.pooling=tf.keras.layers.MaxPool1D()
+    else:
+      self.pooling=tf.keras.layers.MaxPool2D()
   
   def call(self, x):
     x=self.conv(x)
-    #x=self.norm(x)
-    output=self.activation(x)
-    return output
+    x=self.norm(x)
 
-class Conv2DLayer(tf.keras.layers.Layer):
-  def __init__(self, num_filters, filter_size, padding, stride):
-    super(Conv2DLayer, self).__init__()
-    '''
-    Called to inizialize a convolution layer. The convolution layer consists of:
-    -convolution 
-    -batch normalization
-    -activation function
-    '''
+    if (self.applyActivation):
+      x=self.activation(x)
 
-    self.conv=tf.keras.layers.Conv2D(num_filters, filter_size, padding=padding, strides=stride)
-    self.norm=tf.keras.layers.BatchNormalization()
-    self.activation=tf.keras.activations.relu
-  
-  def call(self, x):
-    x=self.conv(x)
-    #x=self.norm(x)
-    output=self.activation(x)
-    return output
+    if (self.applyPooling):
+      x=self.pooling(x)
+    return x
+
+class ResidualLayer(tf.keras.layers.Layer):
+  def __init__(self, conv_type, num_filters, filter_size):
+    super(ResidualLayer, self).__init__()
+
+    self.conv_block_1=ConvLayer(conv_type, num_filters, filter_size)
+    self.conv_block_2=ConvLayer(conv_type, num_filters, filter_size, activation=False)
+
+    #match the dimensions. cases
+    #-[10, 20, 32] and [10, 20, 25] != channel
+    #-[10, 20, 32] and [10, 10, 32] != sequence 
+    #-[10, 20, 32] and [10, 10, 25] != channel and sequence
+
+    if (conv_type=='1d'):
+      self.pooling=tf.keras.layers.MaxPool1D()
+    else:
+      self.pooling=tf.keras.layers.MaxPool2D()
+
+
+  def call(self, x_in):
+    x=self.conv_block_1(x_in)
+    x=self.conv_block_2(x)
+    print('Residual after convolutions:', x.shape)
+
+    x=x + x_in
+
+    print('output residual', x.shape)
+
+    #concatenate
+    print('Input to residual:', x_in.shape)
+    x=self.pooling(x)
+    return x
+
+
 
 class TransformerLayer(tf.keras.layers.Layer):
   def __init__(self, d_model, num_heads, dff, rate=0.1):
