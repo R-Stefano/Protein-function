@@ -39,7 +39,7 @@ def train(model):
     def train_step(x_batch, y_batch):
         #GradientTape traces operations to compute gradients later
         with tf.GradientTape() as tape:
-            predictions = model(x_batch)
+            predictions = model(x_batch, training=True)
             loss = loss_object(y_batch, predictions)
 
         gradients = tape.gradient(loss, model.trainable_variables)
@@ -52,7 +52,7 @@ def train(model):
 
     @tf.function
     def test_step(x_batch, y_batch):
-        predictions = model(x_batch)
+        predictions = model(x_batch, training=False)
         t_loss = loss_object(y_batch, predictions)
 
         test_loss(t_loss)
