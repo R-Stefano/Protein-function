@@ -52,13 +52,13 @@ class Model(tf.keras.Model):
   def call(self, x, training):
     print('Input shape:', x.shape)
 
-    #Positional encoding
-    x += utils.positionalEncoding(x.shape[1], x.shape[-1])
-
     for i, layer in enumerate(self.conv_layers):
         x=layer(x)
         print('conv_{}: {}'.format(i, x.shape))
 
+    #Positional encoding
+    x += utils.positionalEncoding(x.shape[1], x.shape[-1])
+    
     for i, layer in enumerate(self.self_attention_layers):
         x=layer(x, training)
         print('trans_{}: {}'.format(i, x.shape))

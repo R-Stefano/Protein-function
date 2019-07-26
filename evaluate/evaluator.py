@@ -39,6 +39,15 @@ model_recall=tf.keras.metrics.Recall()
 model_precision=tf.keras.metrics.Precision()
 
 #2. TERM-CENTRIC METRICS
+go_terms_f1max=[]
+go_terms_recall=[]
+go_terms_precision=[]
+#create the metrics for each GO term
+for i in range(len(hyperparams['available_gos'])):
+	go_terms_f1max.append(custom.F1MaxScore(thresholds, name="model_f1_max"))
+	go_terms_recall.append(tf.keras.metrics.Recall())
+	go_terms_precision.append(tf.keras.metrics.Precision())
+
 
 #3. GO CLASS-CENTRIC METRICS
 #Map each GO term (label) to its GO Class.
@@ -70,6 +79,23 @@ def protein_centric_metric(y_true, y_pred):
 	model_f1max(y_true, y_pred)
 	model_recall(y_true, y_pred)
 	model_precision(y_true, y_pred)
+
+def term_centric_metric(y_true, y_pred):
+	'''
+	This function computes the F1 score, precision and recall for each go term
+	'''
+	print('GO terms:', y_true.shape[1])
+	for go_term_idx in range(y_true.shape[1]):
+		go_term_y_true=np.reshape(y_true[:, go_term_idx], (-1, 1))
+		go_term_y_pred=np.reshape(y_pred[:, go_term_idx], (-1, 1))
+
+		print('number of examples per go term (should not change', go_term_y_true.shape)
+
+		go_terms_f1max[go_term_idx](go_term_y_true, go_term_y_pred)
+		go_terms_recall[go_term_idx](go_term_y_true, go_term_y_pred)
+		go_terms_precision[go_term_idx](go_term_y_true, go_term_y_pred)
+
+
 
 def go_class_centric_metric(y_true, y_pred):
 	'''
@@ -163,11 +189,11 @@ def evaluate():
 	batch_size=64
 
 	#1. LOAD MODEL
-	spec = importlib.util.spec_from_file_location("module.name", modelPath+"/model.py")
-	netModule = importlib.util.module_from_spec(spec)
-	spec.loader.exec_module(netModule)
-	model=netModule.Model()
-	model.load_weights(modelPath+"/savedModel")
+	#spec = importlib.util.spec_from_file_location("module.name", modelPath+"/model.py")
+	#netModule = importlib.util.module_from_spec(spec)
+	#spec.loader.exec_module(netModule)
+	#model=netModule.Model()
+	#model.load_weights(modelPath+"/savedModel")
 
 	#2. LOAD TEST EXAMPLES
 	ex_folder=os.path.join(dataPath,'test/')
@@ -179,13 +205,13 @@ def evaluate():
 
 	for idx, batch in enumerate(dataset):
 		#DeepFunc model prediction:
-		model_preds=model.predict(batch['X'])
+		#model_preds=model.predict(batch['X'])
 
-		#model_preds=np.random.random(size=(64, 1918)).astype(np.float32)
+		model_preds=np.random.random(size=(64, 1918)).astype(np.float32)
 
 		#3 METRICS:
 		protein_centric_metric(batch['Y'], model_preds)
-		#2. term_centric_metric(batch['Y'], model_preds)
+		term_centric_metric(batch['Y'], model_preds)
 		go_class_centric_metric(batch['Y'], model_preds)
 		break
 
