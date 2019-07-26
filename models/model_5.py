@@ -29,6 +29,12 @@ class Model(tf.keras.Model):
         utils.TransformerLayer(d_model=d_model, num_heads=num_heads, dff=dff)
     ]
 
+    #RNN
+    hidden_units=512
+    self.rnn_layers=[
+      tf.keras.layers.LSTM(hidden_units)
+    ]
+
     #FLAT
     self.flat=tf.keras.layers.Flatten()
 
@@ -58,6 +64,8 @@ class Model(tf.keras.Model):
         print('trans_{}: {}'.format(i, x.shape))
 
     '''
+    -version_7: feature-wise max pooling
+    -version_8: LSTM
     TODO:
     -test with and without positional encoding
     -more transformer layers
@@ -66,11 +74,10 @@ class Model(tf.keras.Model):
     -LSTM
     -feature-wise avg or max pooling
     '''
-    x=self.feature_wise_max_pooling(x)
-    print('handle output transformer:', x.shape)
 
-    x=self.flat(x)
-    print('flatten', x.shape)
+    for i, layer in enumerate(self.rnn_layers):
+      x=layer(x)
+      print('rnn_{}: {}'.format(i, x.shape))
 
     for i,layer in enumerate(self.fc_layers):
       x=layer(x)
