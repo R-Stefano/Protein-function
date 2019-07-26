@@ -1,4 +1,7 @@
 import tensorflow as tf
+import numpy as np
+import obonet
+import yaml
 
 class F1MaxScore(tf.keras.metrics.Metric):
 	'''
@@ -93,3 +96,171 @@ class F1MaxScore(tf.keras.metrics.Metric):
 	def reset_states(self):
 		self.f1_max_sum.assign(0)
 		self.counter.assign(0)
+
+
+class Evaluator():
+	def __init__(self):
+		#thresholds for F1score
+		self.thresholds=np.arange(start=0.1, stop=1.0, step=0.1)
+
+		#Used to retrieve the go class of each go term
+		with open("hyperparams.yaml", 'r') as f:
+			self.hyperparams=yaml.safe_load(f)
+
+		self.graph = obonet.read_obo('extract/go-basic.obo')
+
+		self.defineProteinCentricMetric()
+		self.defineGOTermCentricMetric()
+		self.defineGOClassCentricMetric()
+
+	def defineProteinCentricMetric(self):
+		self.model_f1max=F1MaxScore(self.thresholds, name="model_f1_max")
+		self.model_recall=tf.keras.metrics.Recall()
+		self.model_precision=tf.keras.metrics.Precision()
+
+	def defineGOTermCentricMetric(self):
+		self.go_terms_f1max=[]
+		self.go_terms_recall=[]
+		self.go_terms_precision=[]
+		#create the metrics for each GO term
+		for i in range(len(self.hyperparams['available_gos'])):
+			self.go_terms_f1max.append(F1MaxScore(self.thresholds, name="GO_term_"+str(i)+"_f1_max"))
+			self.go_terms_recall.append(tf.keras.metrics.Recall())
+			self.go_terms_precision.append(tf.keras.metrics.Precision())
+
+	def defineGOClassCentricMetric(self):
+		#Stores the 3 metrics for each go class
+		self.metrics_go_classes={
+			'cellular_component':{},
+			'biological_process':{},
+			'molecular_function':{}
+		}
+
+		#Create the 3 metrics for each go class
+		for go_class in self.metrics_go_classes:
+			self.metrics_go_classes[go_class]['f1']=F1MaxScore(self.thresholds, name=go_class+"_f1_max")
+			self.metrics_go_classes[go_class]['recall']=tf.keras.metrics.Recall(name=go_class+"_recall")
+			self.metrics_go_classes[go_class]['precision']=tf.keras.metrics.Precision(name=go_class+"_precision")
+
+		#Stores the GO term indexs in order to split the predictions in CC, BP and MF
+		self.go_classes_idxs={
+			'cellular_component':[],
+			'biological_process':[],
+			'molecular_function':[]
+		}
+
+		for idx, go_term in enumerate(self.hyperparams['available_gos']):
+			self.go_classes_idxs[self.graph.node[go_term]['namespace']].append(idx)
+
+	def updateProteinCentricMetric(self,y_true, y_pred):
+		self.model_f1max(y_true, y_pred)
+		self.model_recall(y_true, y_pred)
+		self.model_precision(y_true, y_pred)
+
+	def updateGOTermCentricMetric(self,y_true, y_pred):
+		'''
+		This function computes the F1 score, precision and recall for each go term
+		'''
+		for go_term_idx in range(y_true.shape[1]):
+			#Extract go term labels and predictions from the batch
+			go_term_y_true=np.reshape(y_true[:, go_term_idx], (-1, 1))
+			go_term_y_pred=np.reshape(y_pred[:, go_term_idx], (-1, 1))
+
+			#Update the metrics
+			self.go_terms_f1max[go_term_idx](go_term_y_true, go_term_y_pred)
+			self.go_terms_recall[go_term_idx](go_term_y_true, go_term_y_pred)
+			self.go_terms_precision[go_term_idx](go_term_y_true, go_term_y_pred)
+
+	def updateGOClassCentricMetric(self,y_true, y_pred):
+		'''
+		This function computes the F1 score, precision and recall for BP, CC and MF
+		'''
+
+		bp_idxs=np.asarray(self.go_classes_idxs['biological_process'])
+		cc_idxs=np.asarray(self.go_classes_idxs['cellular_component'])
+		mf_idxs=np.asarray(self.go_classes_idxs['molecular_function'])
+
+		#get predictions and labels for each go class
+		y_trues_bp=np.transpose(np.transpose(y_true)[bp_idxs])
+		y_trues_cc=np.transpose(np.transpose(y_true)[cc_idxs])
+		y_trues_mf=np.transpose(np.transpose(y_true)[mf_idxs])
+
+		y_preds_bp=np.transpose(np.transpose(y_pred)[bp_idxs])
+		y_preds_cc=np.transpose(np.transpose(y_pred)[cc_idxs])
+		y_preds_mf=np.transpose(np.transpose(y_pred)[mf_idxs])
+
+		#Update the metrics
+		for metric_name in self.metrics_go_classes['cellular_component']:
+			metric_obj=go_classes_metrics['cellular_component'][metric_name]
+			metric_obj(y_trues_cc, y_preds_cc)
+
+		for metric_name in self.metrics_go_classes['biological_process']:
+			metric_obj=go_classes_metrics['biological_process'][metric_name]
+			metric_obj(y_trues_bp, y_preds_bp)
+		
+		for metric_name in self.metrics_go_classes['molecular_function']:
+			metric_obj=go_classes_metrics['molecular_function'][metric_name]
+			metric_obj(y_trues_mf, y_preds_mf)
+
+	def resultsProteinCentricMetric(self):
+		print('Protein-centric results:')
+		print('>>Model f1_max score:  {:.2f}'.format(self.model_f1max.result().numpy()))
+		print('>>Model recall:    {:.2f}'.format(self.model_recall.result().numpy()))
+		print('>>Model precision: {:.2f}'.format(self.model_precision.result().numpy()))
+
+		return {
+			'f1':        self.model_f1max.result().numpy(),
+			'recall':    self.model_recall.result().numpy(),
+			'precision': self.model_precision.result().numpy()
+			}
+
+	def resultsGOTermCentricMetric(self):
+		print('GO term-centric results:')
+		f1_scores=[model.result().numpy() for model in self.go_terms_f1max]
+		recall_scores=[model.result().numpy() for model in self.go_terms_recall]
+		precision_scores=[model.result().numpy() for model in self.go_terms_precision]
+		
+		print(len(f1_scores))
+
+		print('>>GO Terms average f1_max score:  {:.2f}'.format(np.mean(f1_scores)))
+		print('>>GO Terms average recall:    {:.2f}'.format(np.mean(recall_scores)))
+		print('>>GO Terms average precision: {:.2f}'.format(np.mean(precision_scores)))
+
+		return {
+			'f1':f1_scores,
+			'recall':recall_scores,
+			'precision':precision_scores
+		}
+
+	def resultsGOClassCentricMetric(self):
+		print('GO class-centric results:')
+		metrics=[key for key in self.metrics_go_classes['cellular_component']]
+		print('metrics names:', metrics)
+		for metric in metrics:
+			for go_class in self.metrics_go_classes:
+				metric_obj=self.metrics_go_classes[go_class][metric]
+				print('>>{} {}: {:.2f}'.format(go_class, metric, metric_obj.result().numpy()))
+			print('\n')
+		'''
+		results: {
+			'cellular component': {
+				'f1':score
+				'recall':score
+			},
+			'biological process': {
+				'f1': ...
+			}
+		}
+		'''
+		results={}
+		for go_class in self.metrics_go_classes:
+			results[go_class]={}
+			for metric_name in self.metrics_go_classes[go_class]:
+				metric_obj=self.metrics_go_classes[go_class][metric_name]
+				results[go_class][metric_name]=metric_obj.result().numpy()
+
+		return results
+
+
+
+	
