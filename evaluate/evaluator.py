@@ -96,12 +96,11 @@ def evaluate():
 		#DeepFunc model prediction:
 		#model_preds=model.predict(batch['X'])
 
-		model_preds=np.random.random(size=(64, 1918)).astype(np.float32)
+		model_preds=np.random.randint(2, size=(64, 1918)).astype(np.float32)
 
 		#3 METRICS:
 		evaluator.updateProteinCentricMetric(batch['Y'], model_preds)
 		evaluator.updateGOTermCentricMetric(batch['Y'], model_preds)
 		evaluator.updateGOClassCentricMetric(batch['Y'], model_preds)
-		break
 
 	displayResults()

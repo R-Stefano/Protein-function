@@ -119,14 +119,13 @@ class Evaluator():
 		self.model_precision=tf.keras.metrics.Precision()
 
 	def defineGOTermCentricMetric(self):
-		self.go_terms_f1max=[]
-		self.go_terms_recall=[]
-		self.go_terms_precision=[]
-		#create the metrics for each GO term
-		for i in range(len(self.hyperparams['available_gos'])):
-			self.go_terms_f1max.append(F1MaxScore(self.thresholds, name="GO_term_"+str(i)+"_f1_max"))
-			self.go_terms_recall.append(tf.keras.metrics.Recall())
-			self.go_terms_precision.append(tf.keras.metrics.Precision())
+		self.go_terms_f1max_results=[[] for i in self.hyperparams['available_gos']]
+		self.go_terms_recall_results=[[] for i in self.hyperparams['available_gos']]
+		self.go_terms_precision_results=[[] for i in self.hyperparams['available_gos']]
+
+		self.go_terms_f1max=F1MaxScore(self.thresholds, name="GO_term_f1_max")
+		self.go_terms_recall=tf.keras.metrics.Recall()
+		self.go_terms_precision=tf.keras.metrics.Precision()
 
 	def defineGOClassCentricMetric(self):
 		#Stores the 3 metrics for each go class
@@ -166,10 +165,25 @@ class Evaluator():
 			go_term_y_true=np.reshape(y_true[:, go_term_idx], (-1, 1))
 			go_term_y_pred=np.reshape(y_pred[:, go_term_idx], (-1, 1))
 
-			#Update the metrics
-			self.go_terms_f1max[go_term_idx](go_term_y_true, go_term_y_pred)
-			self.go_terms_recall[go_term_idx](go_term_y_true, go_term_y_pred)
-			self.go_terms_precision[go_term_idx](go_term_y_true, go_term_y_pred)
+			mask=go_term_y_true!=0
+			go_term_y_true=np.reshape(go_term_y_true[mask], (-1, 1))
+			go_term_y_pred=np.reshape(go_term_y_pred[mask], (-1, 1))
+
+			if (len(go_term_y_true) !=0):
+				#Compute the metrics for the go term
+				self.go_terms_f1max(go_term_y_true, go_term_y_pred)
+				self.go_terms_recall(go_term_y_true, go_term_y_pred)
+				self.go_terms_precision(go_term_y_true, go_term_y_pred)
+
+				#Save the results
+				self.go_terms_f1max_results[go_term_idx].append(self.go_terms_f1max.result().numpy())
+				self.go_terms_recall_results[go_term_idx].append(self.go_terms_recall.result().numpy())
+				self.go_terms_precision_results[go_term_idx].append(self.go_terms_precision.result().numpy())
+
+				#Reset the metrics to not affect the next go term
+				self.go_terms_f1max.reset_states()
+				self.go_terms_recall.reset_states()
+				self.go_terms_precision.reset_states()
 
 	def updateGOClassCentricMetric(self,y_true, y_pred):
 		'''
@@ -191,15 +205,15 @@ class Evaluator():
 
 		#Update the metrics
 		for metric_name in self.metrics_go_classes['cellular_component']:
-			metric_obj=go_classes_metrics['cellular_component'][metric_name]
+			metric_obj=self.metrics_go_classes['cellular_component'][metric_name]
 			metric_obj(y_trues_cc, y_preds_cc)
 
 		for metric_name in self.metrics_go_classes['biological_process']:
-			metric_obj=go_classes_metrics['biological_process'][metric_name]
+			metric_obj=self.metrics_go_classes['biological_process'][metric_name]
 			metric_obj(y_trues_bp, y_preds_bp)
 		
 		for metric_name in self.metrics_go_classes['molecular_function']:
-			metric_obj=go_classes_metrics['molecular_function'][metric_name]
+			metric_obj=self.metrics_go_classes['molecular_function'][metric_name]
 			metric_obj(y_trues_mf, y_preds_mf)
 
 	def resultsProteinCentricMetric(self):
@@ -215,13 +229,11 @@ class Evaluator():
 			}
 
 	def resultsGOTermCentricMetric(self):
-		print('GO term-centric results:')
-		f1_scores=[model.result().numpy() for model in self.go_terms_f1max]
-		recall_scores=[model.result().numpy() for model in self.go_terms_recall]
-		precision_scores=[model.result().numpy() for model in self.go_terms_precision]
+		print('\nGO term-centric results:')
+		f1_scores=[np.mean(go_term_values) for go_term_values in self.go_terms_f1max_results]
+		recall_scores=[np.mean(go_term_values) for go_term_values in self.go_terms_recall_results]
+		precision_scores=[np.mean(go_term_values) for go_term_values in self.go_terms_precision_results]
 		
-		print(len(f1_scores))
-
 		print('>>GO Terms average f1_max score:  {:.2f}'.format(np.mean(f1_scores)))
 		print('>>GO Terms average recall:    {:.2f}'.format(np.mean(recall_scores)))
 		print('>>GO Terms average precision: {:.2f}'.format(np.mean(precision_scores)))
@@ -233,9 +245,8 @@ class Evaluator():
 		}
 
 	def resultsGOClassCentricMetric(self):
-		print('GO class-centric results:')
+		print('\nGO class-centric results:')
 		metrics=[key for key in self.metrics_go_classes['cellular_component']]
-		print('metrics names:', metrics)
 		for metric in metrics:
 			for go_class in self.metrics_go_classes:
 				metric_obj=self.metrics_go_classes[go_class][metric]
