@@ -34,11 +34,6 @@ graph = obonet.read_obo('extract/go-basic.obo')
 thresholds=np.arange(start=0.1, stop=1.0, step=0.1)
 
 #1. PROTEIN-CENTRIC METRICS
-#BLAST metrics
-#blast_myMetric=custom.F1MaxScore(thresholds, name="blast_f1_max")
-#blast_recall=tf.keras.metrics.Recall()
-#blast_precision=tf.keras.metrics.Precision()
-#Model metrics
 model_f1max=custom.F1MaxScore(thresholds, name="model_f1_max")
 model_recall=tf.keras.metrics.Recall()
 model_precision=tf.keras.metrics.Precision()

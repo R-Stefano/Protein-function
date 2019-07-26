@@ -53,7 +53,7 @@ class Model(tf.keras.Model):
     print('Input shape:', x.shape)
 
     #Positional encoding
-    #x += utils.positionalEncoding(x.shape[1], x.shape[-1])
+    x += utils.positionalEncoding(x.shape[1], x.shape[-1])
 
     for i, layer in enumerate(self.conv_layers):
         x=layer(x)
@@ -66,6 +66,7 @@ class Model(tf.keras.Model):
     '''
     -version_7: feature-wise max pooling
     -version_8: LSTM
+    -version_9: LSTM + positional encoding
     TODO:
     -test with and without positional encoding
     -more transformer layers
