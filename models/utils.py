@@ -1,6 +1,7 @@
 import tensorflow as tf
+import numpy as np
 class ConvLayer(tf.keras.layers.Layer):
-  def __init__(self, conv_type, num_filters, filter_size, padding='SAME', stride=1, activation=True, pooling=False):
+  def __init__(self, conv_type, num_filters, filter_size, padding='SAME', stride=1, activation=True, pooling=False, dilatation=1):
     super(ConvLayer, self).__init__()
     '''
     Called to inizialize a convolution layer. The convolution layer consists of:
@@ -13,9 +14,9 @@ class ConvLayer(tf.keras.layers.Layer):
     self.applyPooling=pooling
 
     if (conv_type=='1d'):
-      self.conv=tf.keras.layers.Conv1D(num_filters, filter_size, padding=padding, strides=stride)
+      self.conv=tf.keras.layers.Conv1D(num_filters, filter_size, padding=padding, strides=stride, dilation_rate=dilatation)
     else:
-      self.conv=tf.keras.layers.Conv2D(num_filters, filter_size, padding=padding, strides=stride)
+      self.conv=tf.keras.layers.Conv2D(num_filters, filter_size, padding=padding, strides=stride, dilation_rate=dilatation)
 
     self.norm=tf.keras.layers.BatchNormalization()
     
@@ -38,19 +39,19 @@ class ConvLayer(tf.keras.layers.Layer):
     return x
 
 class ResidualLayer(tf.keras.layers.Layer):
-  def __init__(self, conv_type, num_filters, filter_size, pooling):
+  def __init__(self, conv_type, num_filters, filter_size, pooling, dilatation=1):
     super(ResidualLayer, self).__init__()
     self.applyPooling=pooling
 
-    self.conv_block_1=ConvLayer(conv_type, num_filters, filter_size)
-    self.conv_block_2=ConvLayer(conv_type, num_filters, filter_size, activation=False)
+    self.conv_block_1=ConvLayer(conv_type, num_filters, filter_size, dilatation=dilatation)
+    self.conv_block_2=ConvLayer(conv_type, num_filters, filter_size, activation=False, dilatation=dilatation)
 
     #Transform residual block input: (apply 1x1 convolution)
     #-[10, 20, 32] and [10, 20, 25] != channel
     if (conv_type=='1d'):
-      self.transform=tf.keras.layers.Conv1D(num_filters, 1, padding='SAME', strides=1)
+      self.transform=tf.keras.layers.Conv1D(num_filters, 1, padding='SAME', strides=1, dilation_rate=dilatation)
     else:
-      self.transform=tf.keras.layers.Conv2D(num_filters, 1, padding='SAME', strides=1)
+      self.transform=tf.keras.layers.Conv2D(num_filters, 1, padding='SAME', strides=1, dilation_rate=dilatation)
 
     self.residual_activation=tf.keras.activations.relu
 
@@ -103,6 +104,7 @@ class TransformerLayer(tf.keras.layers.Layer):
 
     self.dropout1 = tf.keras.layers.Dropout(dropout_rate)
     self.dropout2 = tf.keras.layers.Dropout(dropout_rate)
+
   def point_wise_feed_forward_network(self, d_model, dff):
     return tf.keras.Sequential([
         tf.keras.layers.Dense(dff, activation='relu'),  # (batch_size, seq_len, dff)
@@ -225,3 +227,28 @@ class MultiHeadAttention(tf.keras.layers.Layer):
     #output: (batch_size, seq_len, d_model)
         
     return output, attention_weights
+
+
+def get_angles(pos, i, d_model):
+  angle_rates = 1 / np.power(10000, (2 * (i//2)) / np.float32(d_model))
+  return pos * angle_rates
+
+def positionalEncoding(seq_length, d_model):
+  '''
+  '''
+  pos=np.expand_dims(np.arange(seq_length), -1) #[seq_length, 1]
+  i=np.expand_dims(np.arange(d_model), 0) #[1, d_model]
+  angle_rads = get_angles(pos,i,d_model) #[seq_length, d_model]
+
+  # apply sin to even indices in the array; 2i
+  sines = np.sin(angle_rads[:, 0::2])
+  
+  # apply cos to odd indices in the array; 2i+1
+  cosines = np.cos(angle_rads[:, 1::2])
+  
+  pos_encoding = np.concatenate([sines, cosines], axis=-1)
+
+  #add batch dimension
+  pos_encoding=np.expand_dims(pos_encoding, 0)
+
+  return tf.cast(pos_encoding, dtype=tf.float32)

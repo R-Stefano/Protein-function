@@ -10,14 +10,17 @@ class Model(tf.keras.Model):
 
     #CNN
     self.conv_layers=[
-        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9),
-        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9, stride=2),
-        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9),
-        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9),
-        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9, stride=2),
-        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9),
-        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9),
-        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9, stride=2)
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9, dilatation=1),
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9, dilatation=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9, dilatation=4),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9, dilatation=8)
+    ]
+
+    self.res_layers=[
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=1, dilatation=1),
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=1, dilatation=1),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=1, dilatation=1),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=1, dilatation=1),
     ]
 
     #TRANSFORMER
@@ -49,23 +52,24 @@ class Model(tf.keras.Model):
     #Positional encoding
     #x += utils.positionalEncoding(x.shape[1], x.shape[-1])
 
+    layers_outs=[x]
+
     for i, layer in enumerate(self.conv_layers):
         x=layer(x)
+        layers_outs.append(x)
         print('conv_{}: {}'.format(i, x.shape))
+
+    x=layers_outs[0]
+    for i, layer in enumerate(self.res_layers):
+        x_transform=layer(x)
+        x = x_transform + layers_outs[i+1]
+
+        print('conv_1x1_{}: {}'.format(i, x.shape))
 
     for i, layer in enumerate(self.self_attention_layers):
         x=layer(x, training)
         print('trans_{}: {}'.format(i, x.shape))
 
-    '''
-    TODO:
-    -test with and without positional encoding
-    -more transformer layers
-    -conv + trans blocks
-    -convs
-    -LSTM
-    -feature-wise avg or max pooling
-    '''
     x=self.feature_wise_max_pooling(x)
     print('handle output transformer:', x.shape)
 

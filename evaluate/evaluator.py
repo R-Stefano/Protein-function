@@ -13,20 +13,6 @@ import prepare.tfapiConverter as tfconv
 FLAGS = flags.FLAGS
 
 '''
-How to use a model developed using Imperative style for prediction.
-
-symbolic or imperative?
-https://medium.com/tensorflow/what-are-symbolic-and-imperative-apis-in-tensorflow-2-0-dfccecb01021
-
-how to save both models
-https://www.tensorflow.org/beta/guide/keras/saving_and_serializing#saving_subclassed_models
-
-how to make transformer in symbolic(functiona API)
-https://medium.com/tensorflow/a-transformer-chatbot-tutorial-with-tensorflow-2-0-88bf59e66fe2
-
-how to make transformer in imperative
-https://www.tensorflow.org/beta/tutorials/text/transformer
-
 This script is used to assess the quality of the model's 
 predictios using the metrics defined in the CAFA challenge.
 
