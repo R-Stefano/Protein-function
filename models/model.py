@@ -14,6 +14,7 @@ class Model(tf.keras.Model):
     d_model=num_heads*head_vecs # 512=8*64
     dff=2048
     self.self_attention_layers=[
+        utils.TransformerLayer(d_model=d_model, num_heads=num_heads, dff=dff),
         utils.TransformerLayer(d_model=d_model, num_heads=num_heads, dff=dff)
     ]
 

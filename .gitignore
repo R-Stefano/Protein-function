@@ -4,6 +4,7 @@ extract/uniprot-filtered-reviewed_yes.xml
 extract/.uniprot-filtered-reviewed_yes.xml.swp
 prepare/data/*
 prepare/.ipynb_checkpoints/*
+prepare_api/*
 train/ckpt/*
 train/logs/*
 train/savedModel/*
