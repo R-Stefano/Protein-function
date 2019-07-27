@@ -52,8 +52,10 @@ class Model(tf.keras.Model):
     -cnn
     '''
 
-    x=tf.math.reduce_mean(x, axis=1)
-    print('projected transformer output:', x.shape)
+    for i, layer in enumerate(self.rnn_layers):
+      x=layer(x)
+      print('rnn_{}: {}'.format(i, x.shape))
+
     for i,layer in enumerate(self.fc_layers):
       x=layer(x)
       print('fc_{}: {}'.format(i, x.shape))
