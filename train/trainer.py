@@ -17,7 +17,7 @@ savedModelPath=FLAGS.savedModelPath
 logsPath='train/logs'
 
 loss_object = tf.keras.losses.BinaryCrossentropy()
-optimizer = tf.keras.optimizers.Adam()
+optimizer = tf.keras.optimizers.Adadelta()
 
 #Loss Metrics
 train_loss = tf.keras.metrics.Mean(name='train_loss')
