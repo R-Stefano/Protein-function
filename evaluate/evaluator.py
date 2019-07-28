@@ -17,13 +17,12 @@ This script is used to assess the quality of the model's
 predictios using the metrics defined in the CAFA challenge.
 
 TODO:
--Define and add term-centri metric
 -Threshold for predictions to 1 or 0. pred_threshold. Which value should have? 
 '''
 
 dataPath=FLAGS.dataPath
 pred_threshold=0.8
-model_version="version_2"
+model_version="version_6"
 modelPath='evaluate/models/'+model_version
 
 evaluator=custom.Evaluator()
@@ -75,11 +74,11 @@ def evaluate():
 
 	#1. LOAD MODEL
 	print('>Loading model')
-	#spec = importlib.util.spec_from_file_location("module.name", modelPath+"/model.py")
-	#netModule = importlib.util.module_from_spec(spec)
-	#spec.loader.exec_module(netModule)
-	#model=netModule.Model()
-	#model.load_weights(modelPath+"/savedModel")
+	spec = importlib.util.spec_from_file_location("module.name", modelPath+"/model.py")
+	netModule = importlib.util.module_from_spec(spec)
+	spec.loader.exec_module(netModule)
+	model=netModule.Model()
+	model.load_weights(modelPath+"/savedModel")
 
 	#2. LOAD TEST EXAMPLES
 	print('>Loading data')
@@ -94,9 +93,7 @@ def evaluate():
 	for idx, batch in enumerate(dataset):
 		print('>Batch', idx+1)
 		#model prediction:
-		#model_preds=model.predict(batch['X'])
-
-		model_preds=np.random.randint(2, size=(64, 1918)).astype(np.float32)
+		model_preds,_=model.predict(batch['X'])
 
 		#3 METRICS:
 		evaluator.updateProteinCentricMetric(batch['Y'], model_preds)
