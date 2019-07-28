@@ -93,7 +93,7 @@ def evaluate():
 	print('>Processing data')
 	for idx, batch in enumerate(dataset):
 		print('>Batch', idx+1)
-		#DeepFunc model prediction:
+		#model prediction:
 		#model_preds=model.predict(batch['X'])
 
 		model_preds=np.random.randint(2, size=(64, 1918)).astype(np.float32)

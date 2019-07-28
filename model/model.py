@@ -9,12 +9,23 @@ class Model(tf.keras.Model):
     conv_type='1d' #sequential data: [batch, seq, vec]
 
     self.conv_layers=[
-      utils.ResidualLayer(conv_type=conv_type, num_filters=32 ,filter_size=9, pooling=True),
-      utils.ResidualLayer(conv_type=conv_type, num_filters=64 ,filter_size=9, pooling=True),
-      utils.ResidualLayer(conv_type=conv_type, num_filters=128 ,filter_size=9, pooling=True),
-      utils.ResidualLayer(conv_type=conv_type, num_filters=256 ,filter_size=9, pooling=True),
-      utils.ResidualLayer(conv_type=conv_type, num_filters=512 ,filter_size=9, pooling=True),
-      utils.ResidualLayer(conv_type=conv_type, num_filters=512 ,filter_size=9, pooling=True)
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=32  ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=64  ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=128 ,filter_size=9, stride=2),
+        utils.ConvLayer(conv_type=conv_type, num_filters=256 ,filter_size=9),
+        utils.ConvLayer(conv_type=conv_type, num_filters=512 ,filter_size=9)
+    ]
+
+    #TRANSFORMER
+    head_vecs=64
+    num_heads=8
+    d_model=num_heads*head_vecs # 512=8*64
+    dff=2048
+    self.self_attention_layers=[
+        utils.TransformerLayer(d_model=d_model, num_heads=num_heads, dff=dff)
     ]
 
     #FLAT
@@ -30,13 +41,19 @@ class Model(tf.keras.Model):
   def call(self, x, training):
     print('Input shape:', x.shape)
 
-    layers_outs=[]
     for i, layer in enumerate(self.conv_layers):
         x=layer(x)
-        layers_outs.append(x)
         print('conv_{}: {}'.format(i, x.shape))
     
-    x=self.flat(x)
+    #Positional encoding
+    x += utils.positionalEncoding(x.shape[1], x.shape[-1])
+
+    for i, layer in enumerate(self.self_attention_layers):
+        x=layer(x, training)
+        print('trans_{}: {}'.format(i, x.shape))
+
+    x=tf.math.reduce_mean(x, axis=1)
+    print('projected transformer output:', x.shape)
 
     for i,layer in enumerate(self.fc_layers):
       x=layer(x)
