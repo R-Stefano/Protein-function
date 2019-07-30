@@ -46,27 +46,6 @@ def displayResults():
 	with open(modelPath+"/results", 'wb') as f:
 		pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
 	
-def extractPredictedGOs(predictions):
-	'''
-	This function maps the predictions to the GO idxs.
-
-	Args:
-		predictions (array): an array of shape [batch_size, num_labels]
-	
-	Returns:
-		An array of shape batch_size, go_terms_predicted with the GO id terms
-
-	'''
-	idxs=np.where(predictions>pred_threshold, 1, 0)
-
-	go_terms_predictions=[]
-	for pred_idxs in idxs:
-		GO_terms_predicted= np.asarray(hyperparams['available_gos'])[np.reshape(np.argwhere(pred_idxs==1), -1)]
-		go_terms_predictions.append(GO_terms_predicted)
-
-	return go_terms_predictions
-
-
 
 def evaluate():
 	#params
@@ -99,5 +78,6 @@ def evaluate():
 		evaluator.updateProteinCentricMetric(batch['Y'], model_preds)
 		evaluator.updateGOTermCentricMetric(batch['Y'], model_preds)
 		evaluator.updateGOClassCentricMetric(batch['Y'], model_preds)
+
 
 	displayResults()
