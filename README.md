@@ -6,7 +6,7 @@ Understanding the activity of discovered proteins can help to understand the mec
 
 In this project, I'm going to develop a model that given a new protein in its amino acids sequence form,it can predict its functions. 
 
-- A more detailed project description is available [Here](http://demiledge.com/topicboard/artificialIntelligence/proteinfunc)
+- A more detailed project description is available [Here](http://www.stefanorosa.me/topicboard/artificialIntelligence/proteinfunc)
 - A web application running the deployed model is accessible [Here](https://no-name-app-bio.herokuapp.com/) 
 
 ## Getting Started
