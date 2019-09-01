@@ -57,10 +57,11 @@ checkpoint_callback=tf.keras.callbacks.ModelCheckpoint(
     save_best_only=True)
 
 model.fit(train_dataset,
-    steps_per_epoch=(train_size//batch_size)+1,
+    steps_per_epoch=(train_size//batch_size)-1,
     epochs=epochs,
     validation_data=test_dataset,
-    validation_steps=(test_size//batch_size)+1,
-    callbacks=[checkpoint_callback])
+    validation_steps=(test_size//batch_size)-1,
+    callbacks=[checkpoint_callback],
+    verbose=2)
 
 model.save(model_dir+model_utils.name+'model.h5')

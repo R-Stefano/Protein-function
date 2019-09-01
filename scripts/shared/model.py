@@ -14,14 +14,27 @@ class ModelInitializer():
     self.encoding_vec=encoding_vec
     self.learning_rate=learning_rate
 
-  def Precision(self):
-    return None
-  
-  def Recall(self):
-    return None
+  def precision(self, y_true, y_pred, threshold=0.5):
+    y_pred=tf.cast(y_pred>=threshold, tf.float32)
 
-  def F1Score(self):
-    return None
+    tp=tf.math.reduce_sum(y_true*y_pred)
+    fp=tf.math.reduce_sum((1-y_true)*y_pred)
+
+    return tp/(tp+fp+1e-9)
+  
+  def recall(self, y_true, y_pred, threshold=0.5):
+    y_pred=tf.cast(y_pred>=threshold, tf.float32)
+
+    tp=tf.math.reduce_sum(y_true*y_pred)
+    fn=tf.math.reduce_sum((1-y_pred)*y_true)
+    return tp/(tp+fn+1e-9)
+
+  def f1score(self, y_true, y_pred):
+    precision=self.precision(y_true, y_pred)
+    recall=self.recall(y_true, y_pred)
+
+    f1=2*precision*recall / (precision + recall)
+    return f1
   
   def architecture(self):
     x_input=layers.Input((self.timesteps, self.encoding_vec), name='input')
@@ -46,7 +59,7 @@ class ModelInitializer():
     model.compile(
         optimizer=tf.keras.optimizers.Adadelta(lr=self.learning_rate),
         loss=tf.keras.losses.binary_crossentropy,
-        metrics=['binary_accuracy']
+        metrics=['binary_accuracy', self.precision, self.recall, self.f1score]
     )
     model.summary()
 
