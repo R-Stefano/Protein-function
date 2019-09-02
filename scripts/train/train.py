@@ -62,6 +62,6 @@ model.fit(train_dataset,
     validation_data=test_dataset,
     validation_steps=(test_size//batch_size)-1,
     callbacks=[checkpoint_callback],
-    verbose=2)
+    verbose=1)
 
 model.save(model_dir+model_utils.name+'model.h5')

@@ -6,14 +6,17 @@ predictios using the metrics defined in the CAFA challenge.
 import tensorflow as tf
 import yaml
 import sys
+import os
 
 import custom_metrics as custom
 
+model_name='CNN_2'
 with open("../../hyperparams.yaml", 'r') as f:
 	configs=yaml.safe_load(f)
 
+data_dir=configs['data_dir']
 test_data_dir=configs['test_data_dir']
-model_dir=configs['model_dir']+'CNN/'
+model_dir=configs['model_dir']+model_name+'/'
 
 shared_scripts_dir=configs['shared_scripts_dir']
 sys.path.append(shared_scripts_dir)
@@ -39,7 +42,7 @@ print('>Loading model..')
 model=tf.keras.models.load_model(model_dir+'model.h5', custom_objects=custom_objects)
 
 print('>Loading metrics..')
-evaluator=custom.Evaluator()
+evaluator=custom.Evaluator(data_dir)
 
 print('>Loading data..')
 test_files=[test_data_dir+fn for fn in os.listdir(test_data_dir)]
@@ -55,13 +58,13 @@ def displayResults():
 	go_class_centric_data=evaluator.resultsGOClassCentricMetric()
 
 	results={
-		'model':model_version,
+		'model':model_name,
 		'protein_centric': protein_centric_data,
 		'go_term_centric': go_term_centric_data,
 		'go_class_centric': go_class_centric_data
 	}
 
-	with open(modelPath+"/results", 'wb') as f:
+	with open(model_dir+"results", 'wb') as f:
 		pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 print('>Processing data..')
@@ -69,15 +72,15 @@ for idx, batch in enumerate(dataset):
 	print('>Batch', idx+1)
 	x, y=batch
 	#model prediction:
-	model_preds,_=model.predict(x)
+	model_preds=model.predict(x)
+
+	print(x.shape, y.shape)
+	print(model_preds.shape)
 
 	#3 METRICS:
 	evaluator.updateProteinCentricMetric(y, model_preds)
 	evaluator.updateGOTermCentricMetric(y, model_preds)
 	evaluator.updateGOClassCentricMetric(y, model_preds)
-
-	break
-
 
 displayResults()
 

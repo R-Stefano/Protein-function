@@ -6,9 +6,9 @@ import tensorflow.keras.metrics as metrics
 
 class ModelInitializer():
   def __init__(self, timesteps, encoding_vec, num_labels, learning_rate):
-    self.name='CNN/'
+    self.name='CNN_2/'
     self.kernels=[32,32,64,64,128,128,256,512]
-    self.strides=[1,2,1,2,1,2,1,1]
+    self.strides=[2,2,2,2,2,2,2,2]
     self.num_labels=num_labels
     self.timesteps=timesteps
     self.encoding_vec=encoding_vec
