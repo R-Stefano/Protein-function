@@ -18,7 +18,7 @@ buffer_size=configs['train']['buffer_size']
 batch_size=configs['train']['batch_size']
 train_size=configs['train']['train_size']
 test_size=configs['train']['test_size']
-learning_rate=configs['train']['batch_size']
+learning_rate=configs['train']['learning_rate']
 
 timesteps=configs['model']['timesteps']
 encoding_vec=configs['model']['encoding_vec']

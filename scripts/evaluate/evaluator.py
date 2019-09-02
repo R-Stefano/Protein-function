@@ -1,34 +1,52 @@
-from absl import flags
-import tensorflow as tf
-import numpy as np
-import obonet
-import pickle
-import os
-import yaml
-import importlib.util
-
-import evaluate.custom_metrics as custom
-import prepare.tfapiConverter as tfconv
-
-FLAGS = flags.FLAGS
-
 '''
 This script is used to assess the quality of the model's 
 predictios using the metrics defined in the CAFA challenge.
-
-TODO:
--Threshold for predictions to 1 or 0. pred_threshold. Which value should have? 
 '''
 
-dataPath=FLAGS.dataPath
-pred_threshold=0.8
-model_version="version_6"
-modelPath='evaluate/models/'+model_version
+import tensorflow as tf
+import yaml
+import sys
 
+import custom_metrics as custom
+
+with open("../../hyperparams.yaml", 'r') as f:
+	configs=yaml.safe_load(f)
+
+test_data_dir=configs['test_data_dir']
+model_dir=configs['model_dir']+'CNN/'
+
+shared_scripts_dir=configs['shared_scripts_dir']
+sys.path.append(shared_scripts_dir)
+import tfapiConverter as tfconv
+import model as model
+
+learning_rate=configs['train']['learning_rate']
+batch_size=configs['train']['batch_size']
+
+timesteps=configs['model']['timesteps']
+encoding_vec=configs['model']['encoding_vec']
+num_labels=configs['model']['num_labels']
+
+model_utils=model.ModelInitializer(timesteps, encoding_vec, num_labels, learning_rate)
+
+custom_objects={
+	'precision':model_utils.precision,
+	'recall':model_utils.recall,
+	'f1score':model_utils.f1score,
+}
+
+print('>Loading model..')
+model=tf.keras.models.load_model(model_dir+'model.h5', custom_objects=custom_objects)
+
+print('>Loading metrics..')
 evaluator=custom.Evaluator()
 
-with open("hyperparams.yaml", 'r') as f:
-	hyperparams=yaml.safe_load(f)
+print('>Loading data..')
+test_files=[test_data_dir+fn for fn in os.listdir(test_data_dir)]
+dataset=tf.data.TFRecordDataset(test_files)
+
+dataset= dataset.map(tfconv.decodeTFRecord)
+dataset=dataset.batch(batch_size)
 
 def displayResults():
 	print('\n\nRESULTS:\n')
@@ -45,39 +63,31 @@ def displayResults():
 
 	with open(modelPath+"/results", 'wb') as f:
 		pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
-	
 
-def evaluate():
-	#params
-	batch_size=64
+print('>Processing data..')
+for idx, batch in enumerate(dataset):
+	print('>Batch', idx+1)
+	x, y=batch
+	#model prediction:
+	model_preds,_=model.predict(x)
 
-	#1. LOAD MODEL
-	print('>Loading model')
-	spec = importlib.util.spec_from_file_location("module.name", modelPath+"/model.py")
-	netModule = importlib.util.module_from_spec(spec)
-	spec.loader.exec_module(netModule)
-	model=netModule.Model()
-	model.load_weights(modelPath+"/savedModel")
+	#3 METRICS:
+	evaluator.updateProteinCentricMetric(y, model_preds)
+	evaluator.updateGOTermCentricMetric(y, model_preds)
+	evaluator.updateGOClassCentricMetric(y, model_preds)
 
-	#2. LOAD TEST EXAMPLES
-	print('>Loading data')
-	ex_folder=os.path.join(dataPath,'test/')
-	test_files=[ex_folder+fn for fn in os.listdir(ex_folder)]
-	dataset=tf.data.TFRecordDataset(test_files)
-
-	dataset= dataset.map(tfconv.decodeTFRecord)
-	dataset=dataset.batch(batch_size)
-
-	print('>Processing data')
-	for idx, batch in enumerate(dataset):
-		print('>Batch', idx+1)
-		#model prediction:
-		model_preds,_=model.predict(batch['X'])
-
-		#3 METRICS:
-		evaluator.updateProteinCentricMetric(batch['Y'], model_preds)
-		evaluator.updateGOTermCentricMetric(batch['Y'], model_preds)
-		evaluator.updateGOClassCentricMetric(batch['Y'], model_preds)
+	break
 
 
-	displayResults()
+displayResults()
+
+
+
+
+
+
+
+
+
+
+

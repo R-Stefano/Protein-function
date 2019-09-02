@@ -78,12 +78,13 @@ def preprocessLabels(goes_seqs, unique_goes, mapped_goes):
     for i, goes_list in enumerate(goes_seqs):
         hot_cat_seq=[]
         for go in goes_list:
-            #get all the parents terms
-            parent_terms=mapped_goes[go]
-            for p_go in parent_terms:
-                label_idx=unique_goes.index(p_go)
-                if label_idx not in hot_cat_seq:
-                    hot_cat_seq.append(label_idx)
+            if go in mapped_goes:
+                #get all the parents terms
+                parent_terms=mapped_goes[go]
+                for p_go in parent_terms:
+                    label_idx=unique_goes.index(p_go)
+                    if label_idx not in hot_cat_seq:
+                        hot_cat_seq.append(label_idx)
 
         if hot_cat_seq==[]:
             mask.append(True)
@@ -149,8 +150,8 @@ for startBatch in range(0, len(proteins_goes), file_batch_size):
     print('Removing dirty examples..')
     batch_inputData=applyMask(dirty_inputData, dirty_idxs)
     batch_labelData=applyMask(dirty_labelData, dirty_idxs)
-    print('Ready input data:', batch_inputData.shape, 'values type', batch_inputData.dtype, 'size:', sys.getsizeof(batch_inputData)*1e-6,'MB')
-    print('Ready label data:', batch_labelData.shape, 'values type', batch_labelData.dtype, 'size:', sys.getsizeof(batch_labelData)*1e-6,'MB')
+    print('Ready input data:', batch_inputData.shape, 'values type', batch_inputData.dtype, 'size:', sys.getsizeof(batch_inputData)*1e-4,'MB')
+    print('Ready label data:', batch_labelData.shape, 'values type', batch_labelData.dtype, 'size:', sys.getsizeof(batch_labelData)*1e-4,'MB')
 
     tot_examples+=batch_inputData.shape[0]
 
