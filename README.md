@@ -2,6 +2,7 @@
 ![test_image](screenshots/main.jpg)
 Proteins are large and complex molecules that play a vital role in almost every function of our body. From contracting muscles to converting food into energy or protecting us from viruses and bacterias. 
 
+
 Understanding the activity of discovered proteins can help to understand the mechanisms of diseases and guide lab experiments reducing tests, time and costs. At the moment, the most reliable procedure to discover protein's function is through manual experiments. However, this approach can't keep the peace with the technologies used to sequencing proteins. There is a need for reliable and fast automated annotators. 
 
 In this project, I'm going to develop a model that given a new protein in its amino acids sequence form,it can predict its functions. 
