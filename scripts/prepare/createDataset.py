@@ -18,14 +18,14 @@ import yaml
 from sklearn.model_selection import train_test_split
 
 
-file_batch_size=200000
+file_batch_size=500000
 with open('../../hyperparams.yaml', 'r') as f:
     configs=yaml.load(f)
 
 data_dir=configs['data_dir']
 train_data_dir=configs['train_data_dir']
 test_data_dir=configs['test_data_dir']
-shared_scripts_dir=configs['shared_scripts_dir']
+shared_scripts_dir=configs['shared_scripts']
 max_seq_length=configs['max_length_aminos']
 min_seq_length=configs['min_length_aminos']
 seed=configs['seed']
@@ -47,8 +47,14 @@ def prepareDataset(inputData, labelData, filename):
 
     X_train, X_test, y_train, y_test = train_test_split(inputData, labelData, test_size=test_size, random_state=seed)
 
-    tfconv.generateTFRecord(X_train, y_train, train_data_dir+filename+'.tfrecords')
-    tfconv.generateTFRecord(X_test, y_test, test_data_dir+filename+'.tfrecords')
+    #tfconv.generateTFRecord(X_train, y_train, train_data_dir+filename+'.tfrecords')
+    #tfconv.generateTFRecord(X_test, y_test, test_data_dir+filename+'.tfrecords')
+    np.save(train_data_dir+'input_'+filename+'.npy', np.stack(X_train))
+    np.save(train_data_dir+'label_'+filename+'.npy', y_train)
+
+    np.save(test_data_dir+'input_'+filename+'.npy', np.stack(X_test))
+    np.save(test_data_dir+'label_'+filename+'.npy', y_test)
+
 
 def applyMask(dirtyData, dirty_idxs):
     if (type(dirtyData)!=type(np.asarray([]))):

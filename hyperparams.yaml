@@ -1,8 +1,8 @@
 data_dir: '/home/steve/Desktop/projects/noname/artemis_project/data/'
 train_data_dir: '/home/steve/Desktop/projects/noname/artemis_project/data/dataset/train/'
 test_data_dir: '/home/steve/Desktop/projects/noname/artemis_project/data/dataset/test/'
-model_dir: '/home/steve/Desktop/projects/noname/artemis_project/data/models/'
-shared_scripts_dir: '/home/steve/Desktop/projects/noname/artemis_project/scripts/shared/'
+models_dir: '/home/steve/Desktop/projects/noname/artemis_project/data/models/'
+shared_scripts: '/home/steve/Desktop/projects/noname/artemis_project/scripts/shared/'
 seed: 0
 test_size: 0.2
 max_length_aminos: 1078
