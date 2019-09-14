@@ -26,33 +26,33 @@ print('label dataset:', len(train_dataset_label[0]))
 
 #Prepare CPC
 model_utils=Model.Model()
-model_dir=models_dir+model_utils.name
 custom_objects={
 	'custom_xent':model_utils.custom_xent,
     'custom_accuracy': model_utils.custom_accuracy
 }
 print('>Loading model..')
-model=tf.keras.models.load_model(model_dir+'model.h5', custom_objects=custom_objects)
+model=tf.keras.models.load_model(models_dir+model_utils.name+'model.h5', custom_objects=custom_objects)
 '''
 model.summary()
 for layer in model.layers:
     print(layer.name)
 '''
 
-learning_rate=0.001
+learning_rate=0.00001
 epochs=10
+batch_size=128
 
 #Instantiate fine_tuner
 cpc_tuner_utils=Model_tuner.Model(learning_rate)
 cpc_tuner=cpc_tuner_utils.architecture(model, 1918)
 
-train_generator=cpc_tuner_utils.prepareBatch(train_dataset_input, train_dataset_label, 64)
-test_generator=cpc_tuner_utils.prepareBatch(test_dataset_input, test_dataset_label, 64)
+train_generator=cpc_tuner_utils.prepareBatch(train_dataset_input, train_dataset_label, batch_size)
+test_generator=cpc_tuner_utils.prepareBatch(test_dataset_input, test_dataset_label, batch_size)
 
 callbacks=[
-    tf.keras.callbacks.TensorBoard(log_dir=model_dir+cpc_tuner_utils.name+'logs/', histogram_freq=1, profile_batch = 3),
+    tf.keras.callbacks.TensorBoard(log_dir=models_dir+cpc_tuner_utils.name+'logs/', histogram_freq=1, profile_batch = 3),
     tf.keras.callbacks.ModelCheckpoint(
-        filepath=model_dir+cpc_tuner_utils.name+'model.{epoch:02d}-{val_loss:.2f}.hdf5' ,
+        filepath=models_dir+cpc_tuner_utils.name+'model.{epoch:02d}-{val_loss:.2f}.hdf5' ,
         monitor='val_custom_accuracy', 
         load_weights_on_restart=True, 
         save_best_only=True),
@@ -67,4 +67,4 @@ cpc_tuner.fit_generator(
     verbose=1
 )
 
-model.save(model_dir+cpc_tuner_utils.name+'model.h5')
+model.save(models_dir+cpc_tuner_utils.name+'model.h5')

@@ -46,7 +46,11 @@ class Model():
 
         cpc_output=cpc_model(x_input)[:, -1] #get last output from [batch, timesteps, rnn_units]
 
-        tuner_output=layers.Dense(units=num_labels, activation='sigmoid', name='tuner_output')(cpc_output)
+        x=layers.Dense(units=512, activation='relu')(cpc_output)
+        x=layers.Dense(units=1024, activation='relu')(x)
+
+
+        tuner_output=layers.Dense(units=num_labels, activation='sigmoid', name='tuner_output')(x)
 
         fine_tuner=tf.keras.Model(
             inputs=x_input,
