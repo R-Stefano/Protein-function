@@ -59,7 +59,7 @@ soupsieve==1.9.2
 statsmodels==0.10.0
 suds-jurko==0.6
 tb-nightly==1.14.0a20190603
-tensorflow==2.0.0b1
+tensorflow==2.9.3
 termcolor==1.1.0
 tf-estimator-nightly==1.14.0.dev2019060501
 urllib3==1.25.3
